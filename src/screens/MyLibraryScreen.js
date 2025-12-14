@@ -13,7 +13,7 @@ import {
   useWindowDimensions 
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Swipeable } from 'react-native-gesture-handler';
+// Swipeable більше не імпортується, оскільки функціонал видалено
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view'; 
@@ -24,73 +24,30 @@ import { ItemType } from '../constants/types';
 // =========================================================
 // 1. КОМПОНЕНТ ОДНОГО ЕЛЕМЕНТА СПИСКУ (LibraryItem)
 // =========================================================
-const LibraryItem = ({ item, type, onSwipeLeft, onSwipeRight, onToggleComplete }) => {
+const LibraryItem = ({ item, type, onToggleComplete, onPressItem, onLongPressItem }) => {
   
-  const isArchived = type === 'archive';
-  
-  const renderRightActions = () => (
-    <View style={styles.rightActionsContainer}>
-      {isArchived ? (
-        <TouchableOpacity style={[styles.actionButton, styles.deleteBtn]} onPress={() => onSwipeRight('delete', item)}>
-          <Ionicons name="trash-outline" size={24} color="#fff" />
-          <Text style={styles.actionText}>Видалити</Text>
-        </TouchableOpacity>
-      ) : (
-        <>
-          <TouchableOpacity style={[styles.actionButton, styles.archiveBtn]} onPress={() => onSwipeRight('archive', item)}>
-            <Ionicons name="archive-outline" size={24} color="#fff" />
-            <Text style={styles.actionText}>Архів</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.deleteBtn]} onPress={() => onSwipeRight('delete', item)}>
-            <Ionicons name="trash-outline" size={24} color="#fff" />
-            <Text style={styles.actionText}>Видалити</Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </View>
-  );
-
-  const renderLeftActions = () => {
-    if (isArchived) { 
-      return (
-        <View style={styles.leftActionsContainer}>
-          <TouchableOpacity style={[styles.actionButton, styles.restoreBtn]} onPress={() => onSwipeLeft('restore', item)}>
-            <Ionicons name="arrow-undo-outline" size={24} color="#fff" />
-            <Text style={styles.actionText}>Повернути</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    } else {
-      return (
-        <View style={styles.leftActionsContainer}>
-          <TouchableOpacity style={[styles.actionButton, styles.editBtn]} onPress={() => onSwipeLeft('edit', item)}>
-            <Ionicons name="create-outline" size={24} color="#fff" />
-            <Text style={styles.actionText}>Редагувати</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-  };
-
+  // Item тепер є чистим TouchableOpacity
   return (
-    <Swipeable renderRightActions={renderRightActions} renderLeftActions={renderLeftActions}>
-      <View style={styles.itemContainer}>
-        {type === 'tasks' && (
-          <TouchableOpacity onPress={() => onToggleComplete(item)} style={styles.checkboxContainer}>
-            <Ionicons name={item.isCompleted ? "checkbox" : "square-outline"} size={28} color={item.isCompleted ? "#4CD964" : "#999"} />
-          </TouchableOpacity>
-        )}
-        <View style={styles.textContainer}>
-          <Text style={[styles.itemText, (item.isCompleted && type === 'tasks') && styles.completedText]}>
-            {item.text}
-          </Text>
-          <View style={styles.metaContainer}>
-            {item.tag && <Text style={styles.tagText}>#{item.tag}</Text>}
-            {item.dueDate && <Text style={styles.dateText}>📅 {new Date(item.dueDate).toLocaleDateString()}</Text>}
-          </View>
+    <TouchableOpacity 
+      style={styles.itemContainer} 
+      onPress={() => onPressItem(item)}
+      onLongPress={() => onLongPressItem(item, type)}
+    >
+      {type === 'tasks' && (
+        <TouchableOpacity onPress={() => onToggleComplete(item)} style={styles.checkboxContainer}>
+          <Ionicons name={item.isCompleted ? "checkbox" : "square-outline"} size={28} color={item.isCompleted ? "#4CD964" : "#999"} />
+        </TouchableOpacity>
+      )}
+      <View style={styles.textContainer}>
+        <Text style={[styles.itemText, (item.isCompleted && type === 'tasks') && styles.completedText]}>
+          {item.text}
+        </Text>
+        <View style={styles.metaContainer}>
+          {item.tag && <Text style={styles.tagText}>#{item.tag}</Text>}
+          {item.dueDate && <Text style={styles.dateText}>📅 {new Date(item.dueDate).toLocaleDateString()}</Text>}
         </View>
       </View>
-    </Swipeable>
+    </TouchableOpacity>
   );
 };
 // =========================================
@@ -129,14 +86,11 @@ const LibraryTab = ({ routeKey, onDataChange, refreshCounter }) => {
     }
   }, [refreshCounter, loadData]);
 
-  const handleToggleComplete = async (item) => {
-    await DataService.updateItem(item.id, { isCompleted: !item.isCompleted });
-    onDataChange(); 
-  };
-
-  const handleSwipeRight = async (action, item) => {
-    if (action === 'archive') await DataService.archiveItem(item.id);
-    else if (action === 'delete') {
+  const handleItemAction = async (action, item) => {
+    if (action === 'archive') {
+      await DataService.archiveItem(item.id);
+      onDataChange();
+    } else if (action === 'delete') {
       Alert.alert("Видалити?", "Безповоротно.", [
         { text: "Скасувати", style: "cancel" },
         { text: "Видалити", style: "destructive", onPress: async () => {
@@ -144,19 +98,10 @@ const LibraryTab = ({ routeKey, onDataChange, refreshCounter }) => {
           onDataChange(); 
         }}
       ]);
-      return;
-    }
-    onDataChange(); 
-  };
-
-  const handleSwipeLeft = async (action, item) => {
-    if (action === 'restore') {
-        // ВИПРАВЛЕННЯ: Використовуємо updateItem для скидання статусу,
-        // якщо DataService.unarchiveItem викликає проблеми
-      await DataService.updateItem(item.id, { 
-            status: 'active' 
-        }); 
-      onDataChange(); // Примусове оновлення всіх вкладок
+      
+    } else if (action === 'restore') {
+      await DataService.updateItem(item.id, { status: 'active' }); 
+      onDataChange(); 
     } else if (action === 'edit') {
       setEditingItem(item);
       setEditText(item.text);
@@ -164,6 +109,59 @@ const LibraryTab = ({ routeKey, onDataChange, refreshCounter }) => {
       setEditDate(item.dueDate ? new Date(item.dueDate) : new Date());
       setEditModalVisible(true);
     }
+  };
+
+
+  const handlePressItem = (item) => {
+    handleItemAction('edit', item);
+  };
+
+  const handleLongPressItem = (item, currentType) => {
+    const isArchived = currentType === 'archive';
+    const isTask = item.type === ItemType.TASK;
+
+    const handleChangeType = async (targetType) => {
+        const newType = targetType === 'task' ? ItemType.TASK : ItemType.IDEA;
+        
+        await DataService.convertItem(item.id, newType, {
+            text: item.text,
+            tag: item.tag || null,
+            dueDate: newType === ItemType.IDEA ? null : item.dueDate
+        });
+        onDataChange(); 
+        Alert.alert("Успіх", `Переміщено в ${targetType === 'task' ? 'Справи' : 'Ідеї'}`);
+    };
+
+    const actions = [
+      { text: "Скасувати", style: "cancel" },
+      
+      { 
+        text: isArchived ? "Повернути" : "Архівувати", 
+        onPress: () => handleItemAction(isArchived ? 'restore' : 'archive', item) 
+      },
+
+      !isArchived && {
+        text: isTask ? "Перемістити в Ідеї" : "Перемістити в Справи",
+        onPress: () => handleChangeType(isTask ? 'idea' : 'task')
+      },
+
+      { 
+        text: "Видалити", 
+        style: "destructive", 
+        onPress: () => handleItemAction('delete', item) 
+      },
+    ].filter(Boolean); 
+
+    Alert.alert(
+        item.text, 
+        "Виберіть дію:", 
+        actions
+    );
+  };
+
+  const handleToggleComplete = async (item) => {
+    await DataService.updateItem(item.id, { isCompleted: !item.isCompleted });
+    onDataChange(); 
   };
 
   const saveEdit = async () => {
@@ -174,6 +172,7 @@ const LibraryTab = ({ routeKey, onDataChange, refreshCounter }) => {
     onDataChange(); 
   };
 
+  // === РЕНДЕР ===
   return (
     <View style={styles.sceneContainer}>
       <FlatList
@@ -183,9 +182,9 @@ const LibraryTab = ({ routeKey, onDataChange, refreshCounter }) => {
           <LibraryItem 
             item={item} 
             type={routeKey}
-            onSwipeLeft={handleSwipeLeft}
-            onSwipeRight={handleSwipeRight}
             onToggleComplete={handleToggleComplete}
+            onPressItem={handlePressItem}
+            onLongPressItem={handleLongPressItem}
           />
         )}
         ListEmptyComponent={
@@ -193,7 +192,7 @@ const LibraryTab = ({ routeKey, onDataChange, refreshCounter }) => {
             <Text style={styles.emptyText}>Пусто</Text>
           </View>
         }
-        contentContainerStyle={{ paddingBottom: 80 }}
+        contentContainerStyle={{ paddingBottom: 80, paddingTop: 10 }} 
       />
 
       {/* Модальне вікно редагування */}
@@ -283,7 +282,20 @@ const styles = StyleSheet.create({
   sceneContainer: { flex: 1, backgroundColor: '#F5F7FA' },
 
   // Item Styles
-  itemContainer: { backgroundColor: '#fff', padding: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', flexDirection: 'row', alignItems: 'center' },
+  itemContainer: { 
+    backgroundColor: '#fff', 
+    padding: 15, 
+    marginHorizontal: 10, 
+    marginVertical: 5,   
+    borderRadius: 10,    
+    flexDirection: 'row', 
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   checkboxContainer: { marginRight: 15 },
   textContainer: { flex: 1 },
   itemText: { fontSize: 16, color: '#333' },
@@ -292,7 +304,7 @@ const styles = StyleSheet.create({
   tagText: { fontSize: 12, color: '#4A90E2', marginRight: 10, fontWeight: '600' },
   dateText: { fontSize: 12, color: '#999' },
   
-  // Swipe Actions
+  // Swipe Actions (НЕ ВИКОРИСТОВУЮТЬСЯ, але стилі залишаємо)
   rightActionsContainer: { flexDirection: 'row', width: 140 },
   leftActionsContainer: { flexDirection: 'row', width: 80 },
   actionButton: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -306,9 +318,15 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', marginTop: 50 },
   emptyText: { color: '#999', fontSize: 16 },
 
-  // Modal (спрощені стилі)
+  // Modal (ОНОВЛЕНО: Більше заокруглення)
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalView: { width: '90%', backgroundColor: '#fff', borderRadius: 15, padding: 20 },
+  modalView: { 
+    width: '90%', 
+    backgroundColor: 'white', 
+    borderRadius: 25, // <<< Збільшено для кращого візуального ефекту
+    overflow: 'hidden', // <<< НОВЕ: ПРИМУСОВО ОБРІЗАЄМО ВМІСТ
+    padding: 20 
+  },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, backgroundColor: '#f9f9f9', marginBottom: 10 },
   textArea: { minHeight: 60, textAlignVertical: 'top' },
