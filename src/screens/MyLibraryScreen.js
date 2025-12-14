@@ -16,54 +16,60 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { TabView, SceneMap, TabBar } from 'react-native-tab-view'; // <--- НОВІ ІМПОРТИ
+import { TabView, SceneMap, TabBar } from 'react-native-tab-view'; 
 
 import DataService from '../data/DataService';
 import { ItemType } from '../constants/types';
 
 // =========================================================
-// 1. КОМПОНЕНТ ОДНОГО ЕЛЕМЕНТА СПИСКУ (Той самий, що й був)
+// 1. КОМПОНЕНТ ОДНОГО ЕЛЕМЕНТА СПИСКУ (LibraryItem)
 // =========================================================
 const LibraryItem = ({ item, type, onSwipeLeft, onSwipeRight, onToggleComplete }) => {
+  
+  const isArchived = type === 'archive';
+  
   const renderRightActions = () => (
     <View style={styles.rightActionsContainer}>
-      {type === 'archive' ? (
-         <TouchableOpacity style={[styles.actionButton, styles.deleteBtn]} onPress={() => onSwipeRight('delete', item)}>
-           <Ionicons name="trash-outline" size={24} color="#fff" />
-           <Text style={styles.actionText}>Видалити</Text>
-         </TouchableOpacity>
+      {isArchived ? (
+        <TouchableOpacity style={[styles.actionButton, styles.deleteBtn]} onPress={() => onSwipeRight('delete', item)}>
+          <Ionicons name="trash-outline" size={24} color="#fff" />
+          <Text style={styles.actionText}>Видалити</Text>
+        </TouchableOpacity>
       ) : (
-         <>
-           <TouchableOpacity style={[styles.actionButton, styles.archiveBtn]} onPress={() => onSwipeRight('archive', item)}>
-             <Ionicons name="archive-outline" size={24} color="#fff" />
-             <Text style={styles.actionText}>Архів</Text>
-           </TouchableOpacity>
-           <TouchableOpacity style={[styles.actionButton, styles.deleteBtn]} onPress={() => onSwipeRight('delete', item)}>
-             <Ionicons name="trash-outline" size={24} color="#fff" />
-             <Text style={styles.actionText}>Видалити</Text>
-           </TouchableOpacity>
-         </>
+        <>
+          <TouchableOpacity style={[styles.actionButton, styles.archiveBtn]} onPress={() => onSwipeRight('archive', item)}>
+            <Ionicons name="archive-outline" size={24} color="#fff" />
+            <Text style={styles.actionText}>Архів</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionButton, styles.deleteBtn]} onPress={() => onSwipeRight('delete', item)}>
+            <Ionicons name="trash-outline" size={24} color="#fff" />
+            <Text style={styles.actionText}>Видалити</Text>
+          </TouchableOpacity>
+        </>
       )}
     </View>
   );
 
   const renderLeftActions = () => {
-    if (type === 'ideas') return null;
-    return (
-      <View style={styles.leftActionsContainer}>
-        {type === 'archive' ? (
+    if (isArchived) { 
+      return (
+        <View style={styles.leftActionsContainer}>
           <TouchableOpacity style={[styles.actionButton, styles.restoreBtn]} onPress={() => onSwipeLeft('restore', item)}>
             <Ionicons name="arrow-undo-outline" size={24} color="#fff" />
             <Text style={styles.actionText}>Повернути</Text>
           </TouchableOpacity>
-        ) : (
+        </View>
+      );
+    } else {
+      return (
+        <View style={styles.leftActionsContainer}>
           <TouchableOpacity style={[styles.actionButton, styles.editBtn]} onPress={() => onSwipeLeft('edit', item)}>
             <Ionicons name="create-outline" size={24} color="#fff" />
             <Text style={styles.actionText}>Редагувати</Text>
           </TouchableOpacity>
-        )}
-      </View>
-    );
+        </View>
+      );
+    }
   };
 
   return (
@@ -79,22 +85,23 @@ const LibraryItem = ({ item, type, onSwipeLeft, onSwipeRight, onToggleComplete }
             {item.text}
           </Text>
           <View style={styles.metaContainer}>
-             {item.tag && <Text style={styles.tagText}>#{item.tag}</Text>}
-             {item.dueDate && <Text style={styles.dateText}>📅 {new Date(item.dueDate).toLocaleDateString()}</Text>}
+            {item.tag && <Text style={styles.tagText}>#{item.tag}</Text>}
+            {item.dueDate && <Text style={styles.dateText}>📅 {new Date(item.dueDate).toLocaleDateString()}</Text>}
           </View>
         </View>
       </View>
     </Swipeable>
   );
 };
+// =========================================
+
 
 // =========================================================
-// 2. КОМПОНЕНТ ВКЛАДКИ (СПИСОК)
+// 2. КОМПОНЕНТ ВКЛАДКИ (СПИСОК) - LibraryTab
 // =========================================================
-const LibraryTab = ({ routeKey }) => {
+const LibraryTab = ({ routeKey, onDataChange, refreshCounter }) => {
   const [data, setData] = useState([]);
   
-  // Modal State (локальний для вкладки)
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [editText, setEditText] = useState('');
@@ -102,24 +109,29 @@ const LibraryTab = ({ routeKey }) => {
   const [editDate, setEditDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Завантаження даних при фокусі
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [routeKey])
-  );
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     let result = [];
     if (routeKey === 'tasks') result = await DataService.getTasks();
     else if (routeKey === 'ideas') result = await DataService.getIdeas();
     else if (routeKey === 'archive') result = await DataService.getArchived();
     setData(result);
-  };
+  }, [routeKey]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]) 
+  );
+  
+  useEffect(() => {
+    if (refreshCounter > 0) {
+      loadData();
+    }
+  }, [refreshCounter, loadData]);
 
   const handleToggleComplete = async (item) => {
     await DataService.updateItem(item.id, { isCompleted: !item.isCompleted });
-    loadData();
+    onDataChange(); 
   };
 
   const handleSwipeRight = async (action, item) => {
@@ -128,19 +140,23 @@ const LibraryTab = ({ routeKey }) => {
       Alert.alert("Видалити?", "Безповоротно.", [
         { text: "Скасувати", style: "cancel" },
         { text: "Видалити", style: "destructive", onPress: async () => {
-            await DataService.deleteItem(item.id);
-            loadData();
+          await DataService.deleteItem(item.id);
+          onDataChange(); 
         }}
       ]);
       return;
     }
-    loadData();
+    onDataChange(); 
   };
 
   const handleSwipeLeft = async (action, item) => {
     if (action === 'restore') {
-      await DataService.updateItem(item.id, { status: 'active' });
-      loadData();
+        // ВИПРАВЛЕННЯ: Використовуємо updateItem для скидання статусу,
+        // якщо DataService.unarchiveItem викликає проблеми
+      await DataService.updateItem(item.id, { 
+            status: 'active' 
+        }); 
+      onDataChange(); // Примусове оновлення всіх вкладок
     } else if (action === 'edit') {
       setEditingItem(item);
       setEditText(item.text);
@@ -155,7 +171,7 @@ const LibraryTab = ({ routeKey }) => {
     if (editingItem.type === ItemType.TASK) updates.dueDate = editDate.toISOString();
     await DataService.updateItem(editingItem.id, updates);
     setEditModalVisible(false);
-    loadData();
+    onDataChange(); 
   };
 
   return (
@@ -180,7 +196,7 @@ const LibraryTab = ({ routeKey }) => {
         contentContainerStyle={{ paddingBottom: 80 }}
       />
 
-      {/* Модальне вікно (вбудоване в кожну вкладку для простоти) */}
+      {/* Модальне вікно редагування */}
       <Modal animationType="slide" transparent={true} visible={editModalVisible} onRequestClose={() => setEditModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalView}>
@@ -194,7 +210,7 @@ const LibraryTab = ({ routeKey }) => {
               </TouchableOpacity>
             )}
             {showDatePicker && (
-               <DateTimePicker value={editDate} mode="date" onChange={(e, d) => { setShowDatePicker(Platform.OS==='ios'); if(d) setEditDate(d); }} />
+              <DateTimePicker value={editDate} mode="date" onChange={(e, d) => { setShowDatePicker(Platform.OS==='ios'); if(d) setEditDate(d); }} />
             )}
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.modalBtn, styles.cancelBtn]} onPress={() => setEditModalVisible(false)}><Text>Скасувати</Text></TouchableOpacity>
@@ -213,6 +229,14 @@ const LibraryTab = ({ routeKey }) => {
 export default function MyLibraryScreen() {
   const layout = useWindowDimensions();
 
+  // Централізований стан оновлення
+  const [refreshCounter, setRefreshCounter] = useState(0);
+
+  // Колбек для оновлення лічильника
+  const handleDataChange = useCallback(() => {
+    setRefreshCounter(prev => prev + 1);
+  }, []);
+
   // Налаштування вкладок
   const [index, setIndex] = useState(0);
   const [routes] = useState([
@@ -224,9 +248,10 @@ export default function MyLibraryScreen() {
   // Рендер сцен (вкладок)
   const renderScene = ({ route }) => {
     switch (route.key) {
-      case 'tasks': return <LibraryTab routeKey="tasks" />;
-      case 'ideas': return <LibraryTab routeKey="ideas" />;
-      case 'archive': return <LibraryTab routeKey="archive" />;
+      // Передаємо колбек і лічильник у кожну вкладку
+      case 'tasks': return <LibraryTab routeKey="tasks" onDataChange={handleDataChange} refreshCounter={refreshCounter} />;
+      case 'ideas': return <LibraryTab routeKey="ideas" onDataChange={handleDataChange} refreshCounter={refreshCounter} />;
+      case 'archive': return <LibraryTab routeKey="archive" onDataChange={handleDataChange} refreshCounter={refreshCounter} />;
       default: return null;
     }
   };
@@ -256,7 +281,7 @@ export default function MyLibraryScreen() {
 
 const styles = StyleSheet.create({
   sceneContainer: { flex: 1, backgroundColor: '#F5F7FA' },
-  
+
   // Item Styles
   itemContainer: { backgroundColor: '#fff', padding: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', flexDirection: 'row', alignItems: 'center' },
   checkboxContainer: { marginRight: 15 },

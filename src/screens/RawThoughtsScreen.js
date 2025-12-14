@@ -4,7 +4,7 @@ import {
   StyleSheet, 
   Text, 
   View, 
-  FlatList, 
+  FlatList, // Залишаємо FlatList, але тепер він оброблятиме і заголовки
   TouchableOpacity, 
   Alert, 
   Modal, 
@@ -18,6 +18,57 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 
 import DataService from '../data/DataService';
 import { ItemType } from '../constants/types';
+
+// === ДОПОМІЖНІ ФУНКЦІЇ ДЛЯ ДАТИ ===
+
+const formatDateHeader = (dateString) => {
+  const date = new Date(dateString);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  // Функція для порівняння лише дати (без часу)
+  const isSameDay = (d1, d2) => 
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate();
+
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedDate = date.toLocaleDateString('uk-UA', options);
+
+  if (isSameDay(date, today)) return `Сьогодні, ${formattedDate}`;
+  if (isSameDay(date, yesterday)) return `Вчора, ${formattedDate}`;
+
+  return formattedDate;
+};
+
+// Функція для групування сирих думок за датою
+const groupThoughtsByDate = (thoughts) => {
+  const grouped = [];
+  let lastDate = null;
+
+  for (const thought of thoughts) {
+    // Отримуємо лише дату (YYYY-MM-DD) для заголовка
+    const currentDate = new Date(thought.createdAt).toISOString().split('T')[0];
+
+    if (currentDate !== lastDate) {
+      // Додаємо елемент-заголовок, коли дата змінюється
+      grouped.push({ id: 'header-' + currentDate, isHeader: true, date: currentDate });
+      lastDate = currentDate;
+    }
+
+    // Додаємо саму думку
+    grouped.push(thought);
+  }
+  return grouped;
+};
+
+// === КОМПОНЕНТ ЗАГОЛОВКА ДАТИ ===
+const DateHeader = ({ dateString }) => (
+  <View style={styles.dateHeaderContainer}>
+    <Text style={styles.dateHeaderText}>{formatDateHeader(dateString)}</Text>
+  </View>
+);
 
 // === КОМПОНЕНТ ОДНОГО ЕЛЕМЕНТА СПИСКУ (SWIPEABLE) ===
 const ThoughtItem = ({ item, onSwipeLeft, onSwipeRight }) => {
@@ -54,11 +105,14 @@ const ThoughtItem = ({ item, onSwipeLeft, onSwipeRight }) => {
     );
   };
 
+  // Оновлено: відображаємо дату і час
+  const formattedDateAndTime = `${new Date(item.createdAt).toLocaleDateString('uk-UA')} ${new Date(item.createdAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}`;
+
   return (
     <Swipeable renderRightActions={renderRightActions} renderLeftActions={renderLeftActions}>
       <View style={styles.itemContainer}>
         <Text style={styles.itemText}>{item.text}</Text>
-        <Text style={styles.itemDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+        <Text style={styles.itemDate}>{formattedDateAndTime}</Text>
       </View>
     </Swipeable>
   );
@@ -66,7 +120,7 @@ const ThoughtItem = ({ item, onSwipeLeft, onSwipeRight }) => {
 
 // === ГОЛОВНИЙ ЕКРАН ===
 export default function RawThoughtsScreen({ navigation }) {
-  const [thoughts, setThoughts] = useState([]);
+  const [thoughts, setThoughts] = useState([]); // Тепер містить об'єкти думок та об'єкти-заголовки
   
   // Стейт для модального вікна конвертації
   const [modalVisible, setModalVisible] = useState(false);
@@ -87,12 +141,17 @@ export default function RawThoughtsScreen({ navigation }) {
   );
 
   const loadData = async () => {
-    const data = await DataService.getRawThoughts();
-    setThoughts(data);
+    // DataService.getRawThoughts() вже повертає відсортований список (найновіші зверху)
+    const rawData = await DataService.getRawThoughts();
+    const groupedData = groupThoughtsByDate(rawData); // Групуємо дані
+    setThoughts(groupedData);
   };
 
   // Обробка свайпа вправо (Архів/Видалення)
   const handleSwipeRight = async (action, item) => {
+    // Перевіряємо, чи це випадково не заголовок
+    if (item.isHeader) return;
+    
     if (action === 'archive') {
       await DataService.archiveItem(item.id);
       loadData(); // Оновлюємо список
@@ -114,6 +173,9 @@ export default function RawThoughtsScreen({ navigation }) {
 
   // Обробка свайпа вліво (Відкриття модалки)
   const handleSwipeLeft = (type, item) => {
+    // Перевіряємо, чи це випадково не заголовок
+    if (item.isHeader) return; 
+
     setSelectedItem(item);
     setTargetType(type); // 'task' або 'idea'
     
@@ -148,25 +210,34 @@ export default function RawThoughtsScreen({ navigation }) {
     Alert.alert("Успіх", `Перенесено в ${targetType === 'task' ? 'Справи' : 'Ідеї'}`);
   };
 
+  // Рендер елементів списку, який тепер вміє відображати і заголовки
+  const renderThoughtOrHeader = ({ item }) => {
+    if (item.isHeader) {
+      return <DateHeader dateString={item.date} />;
+    }
+    
+    return (
+      <ThoughtItem 
+        item={item} 
+        onSwipeRight={handleSwipeRight} 
+        onSwipeLeft={handleSwipeLeft} 
+      />
+    );
+  };
+
   // Рендер списку
   return (
     <View style={styles.container}>
       <FlatList
         data={thoughts}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <ThoughtItem 
-            item={item} 
-            onSwipeRight={handleSwipeRight} 
-            onSwipeLeft={handleSwipeLeft} 
-          />
-        )}
-        ListHeaderComponent={
-          <View style={styles.headerContainer}>
-            <Text style={styles.headerTitle}>Сирі думки</Text>
-            <Text style={styles.headerSubtitle}>Просто ваші сирі думки</Text>
-          </View>
-        }
+        keyExtractor={(item) => item.id}
+        renderItem={renderThoughtOrHeader}
+        // ListHeaderComponent={
+        //   <View style={styles.headerContainer}>
+        //     <Text style={styles.headerTitle}>Сирі думки</Text>
+        //     <Text style={styles.headerSubtitle}>Просто ваші сирі думки</Text>
+        //   </View>
+        // }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>Поки що тут пусто.</Text>
@@ -275,6 +346,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginTop: 5,
+    marginBottom: 5, // Додав невеликий відступ, щоб не зливався з першим заголовком дати
+  },
+  // New Date Header Styles
+  dateHeaderContainer: {
+    backgroundColor: '#E0E3E8', // Легкий фон для роздільника
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#d0d3d8',
+  },
+  dateHeaderText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#555',
   },
   // List Item
   itemContainer: {
