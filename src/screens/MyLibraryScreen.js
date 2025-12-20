@@ -1,5 +1,5 @@
 // src/screens/MyLibraryScreen.js
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -17,7 +17,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { TabView, TabBar } from 'react-native-tab-view'; 
 
 import DataService from '../data/DataService';
-import { ItemType } from '../constants/types';
+import { ItemType, ItemStatus } from '../constants/types';
 import { useTheme } from '../context/ThemeContext';
 
 const LibraryItem = ({ item, type, onToggleComplete, onPressItem, onLongPressItem, colors }) => (
@@ -58,9 +58,8 @@ const LibraryItem = ({ item, type, onToggleComplete, onPressItem, onLongPressIte
   </TouchableOpacity>
 );
 
-const LibraryTab = ({ routeKey }) => {
+const LibraryTab = ({ routeKey, data, refreshAll }) => {
   const { colors } = useTheme();
-  const [data, setData] = useState([]);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [actionsModalVisible, setActionsModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -71,16 +70,6 @@ const LibraryTab = ({ routeKey }) => {
   const [editDate, setEditDate] = useState(new Date());
   const [hasDueDate, setHasDueDate] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-
-  const loadData = useCallback(async () => {
-    let result = [];
-    if (routeKey === 'tasks') result = await DataService.getTasks();
-    else if (routeKey === 'ideas') result = await DataService.getIdeas();
-    else if (routeKey === 'archive') result = await DataService.getArchived();
-    setData(result);
-  }, [routeKey]);
-
-  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const openEdit = (item) => {
     setSelectedItem(item);
@@ -99,19 +88,23 @@ const LibraryTab = ({ routeKey }) => {
     };
     await DataService.updateItem(selectedItem.id, updates);
     setEditModalVisible(false);
-    loadData();
+    refreshAll(); // Оновлюємо глобально
   };
 
   const handleQuickAction = async (action) => {
     setActionsModalVisible(false);
-    if (action === 'archive') await DataService.archiveItem(selectedItem.id);
-    else if (action === 'restore') await DataService.updateItem(selectedItem.id, { status: 'active' });
-    else if (action === 'convert') {
+    if (action === 'archive') {
+      await DataService.archiveItem(selectedItem.id);
+    } else if (action === 'restore') {
+      await DataService.updateItem(selectedItem.id, { status: ItemStatus.ACTIVE });
+    } else if (action === 'convert') {
       const newType = selectedItem.type === ItemType.TASK ? ItemType.IDEA : ItemType.TASK;
-      // При конвертації скидаємо дату, якщо це перетворення на ідею
       await DataService.convertItem(selectedItem.id, newType, { dueDate: null });
-    } else if (action === 'delete') { setDeleteModalVisible(true); return; }
-    loadData();
+    } else if (action === 'delete') { 
+      setDeleteModalVisible(true); 
+      return; 
+    }
+    refreshAll(); // Оновлюємо глобально для всіх вкладок
   };
 
   return (
@@ -126,7 +119,10 @@ const LibraryTab = ({ routeKey }) => {
             colors={colors}
             onPressItem={openEdit} 
             onLongPressItem={(i) => {setSelectedItem(i); setActionsModalVisible(true);}} 
-            onToggleComplete={async (i) => { await DataService.updateItem(i.id, { isCompleted: !i.isCompleted }); loadData(); }} 
+            onToggleComplete={async (i) => { 
+              await DataService.updateItem(i.id, { isCompleted: !i.isCompleted }); 
+              refreshAll(); 
+            }} 
           />
         )}
         ListEmptyComponent={() => (
@@ -138,64 +134,31 @@ const LibraryTab = ({ routeKey }) => {
         contentContainerStyle={data.length === 0 ? { flex: 1 } : { paddingVertical: 12 }} 
       />
 
-      {/* РЕДАГУВАННЯ */}
-      <Modal visible={editModalVisible} transparent animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
+      {/* Редагування */}
+      <Modal visible={editModalVisible} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => setEditModalVisible(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
               <View style={[styles.modalView, { backgroundColor: colors.card }]}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>Редагувати</Text>
+                <TextInput style={[styles.input, { backgroundColor: colors.surfaceVariant, color: colors.text }]} multiline value={editText} onChangeText={setEditText} />
+                <TextInput style={[styles.input, { backgroundColor: colors.surfaceVariant, color: colors.text, marginTop: 12, minHeight: 45 }]} placeholder="Тег" value={editTag} onChangeText={setEditTag} />
                 
-                <TextInput 
-                  style={[styles.input, { backgroundColor: colors.surfaceVariant, color: colors.text }]} 
-                  multiline 
-                  value={editText} 
-                  onChangeText={setEditText} 
-                />
-                
-                <TextInput 
-                  style={[styles.input, { backgroundColor: colors.surfaceVariant, color: colors.text, marginTop: 12, minHeight: 45 }]} 
-                  placeholder="Тег (напр. робота)"
-                  placeholderTextColor={colors.textSecondary}
-                  value={editTag} 
-                  onChangeText={setEditTag} 
-                />
-
                 {selectedItem?.type === ItemType.TASK && (
                   <View style={{marginTop: 16}}>
-                    <TouchableOpacity 
-                      style={[styles.dateToggle, { backgroundColor: colors.surfaceVariant }]} 
-                      onPress={() => setHasDueDate(!hasDueDate)}
-                    >
+                    <TouchableOpacity style={[styles.dateToggle, { backgroundColor: colors.surfaceVariant }]} onPress={() => setHasDueDate(!hasDueDate)}>
                       <Text style={{color: colors.text}}>{hasDueDate ? `📅 ${editDate.toLocaleDateString()}` : "Без терміну"}</Text>
                       <Ionicons name="calendar-outline" size={20} color={colors.primary} />
                     </TouchableOpacity>
-                    {hasDueDate && (
-                      <TouchableOpacity onPress={() => setShowDatePicker(true)} style={{marginTop: 8}}>
-                        <Text style={{color: colors.primary, textAlign: 'center'}}>Змінити дату</Text>
-                      </TouchableOpacity>
-                    )}
+                    {hasDueDate && <TouchableOpacity onPress={() => setShowDatePicker(true)} style={{marginTop: 8}}><Text style={{color: colors.primary, textAlign: 'center'}}>Змінити дату</Text></TouchableOpacity>}
                   </View>
                 )}
 
-                {showDatePicker && (
-                  <DateTimePicker 
-                    value={editDate} 
-                    mode="date" 
-                    onChange={(e, d) => { setShowDatePicker(false); if(d) setEditDate(d); }} 
-                  />
-                )}
+                {showDatePicker && <DateTimePicker value={editDate} mode="date" onChange={(e, d) => { setShowDatePicker(false); if(d) setEditDate(d); }} />}
 
                 <View style={styles.modalButtons}>
-                  <TouchableOpacity style={styles.modalBtn} onPress={() => setEditModalVisible(false)}>
-                    <Text style={{ color: colors.primary }}>Скасувати</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.modalBtn, { backgroundColor: colors.primary }]} 
-                    onPress={handleSaveEdit}
-                  >
-                    <Text style={{ color: '#fff' }}>Зберегти</Text>
-                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.modalBtn} onPress={() => setEditModalVisible(false)}><Text style={{ color: colors.primary }}>Скасувати</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.primary }]} onPress={handleSaveEdit}><Text style={{ color: '#fff' }}>Зберегти</Text></TouchableOpacity>
                 </View>
               </View>
             </TouchableWithoutFeedback>
@@ -203,28 +166,23 @@ const LibraryTab = ({ routeKey }) => {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* МЕНЮ ДІЙ (CONTEXT MENU) */}
-      <Modal visible={actionsModalVisible} transparent animationType="slide" onRequestClose={() => setActionsModalVisible(false)}>
+      {/* Швидкі дії */}
+      <Modal visible={actionsModalVisible} transparent animationType="slide">
         <TouchableWithoutFeedback onPress={() => setActionsModalVisible(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
               <View style={[styles.modalView, styles.bottomSheet, { backgroundColor: colors.card }]}>
                 <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
-                
                 <TouchableOpacity style={styles.menuItem} onPress={() => handleQuickAction(routeKey === 'archive' ? 'restore' : 'archive')}>
                   <Ionicons name={routeKey === 'archive' ? "refresh-outline" : "archive-outline"} size={22} color={colors.text} />
                   <Text style={[styles.menuText, { color: colors.text }]}>{routeKey === 'archive' ? 'Відновити' : 'В архів'}</Text>
                 </TouchableOpacity>
-
                 {routeKey !== 'archive' && (
                   <TouchableOpacity style={styles.menuItem} onPress={() => handleQuickAction('convert')}>
                     <Ionicons name={selectedItem?.type === ItemType.TASK ? "bulb-outline" : "checkbox-outline"} size={22} color={colors.text} />
-                    <Text style={[styles.menuText, { color: colors.text }]}>
-                      {selectedItem?.type === ItemType.TASK ? 'Зробити ідеєю' : 'Зробити справою'}
-                    </Text>
+                    <Text style={[styles.menuText, { color: colors.text }]}>{selectedItem?.type === ItemType.TASK ? 'Зробити ідеєю' : 'Зробити справою'}</Text>
                   </TouchableOpacity>
                 )}
-
                 <TouchableOpacity style={styles.menuItem} onPress={() => handleQuickAction('delete')}>
                   <Ionicons name="trash-outline" size={22} color={colors.error} />
                   <Text style={[styles.menuText, { color: colors.error }]}>Видалити назавжди</Text>
@@ -235,8 +193,8 @@ const LibraryTab = ({ routeKey }) => {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* МОДАЛ ВИДАЛЕННЯ */}
-      <Modal visible={deleteModalVisible} transparent animationType="fade" onRequestClose={() => setDeleteModalVisible(false)}>
+      {/* Підтвердження видалення */}
+      <Modal visible={deleteModalVisible} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => setDeleteModalVisible(false)}>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalView, { backgroundColor: colors.card }]}>
@@ -246,7 +204,7 @@ const LibraryTab = ({ routeKey }) => {
                 <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.error }]} onPress={async () => {
                   await DataService.deleteItem(selectedItem.id);
                   setDeleteModalVisible(false);
-                  loadData();
+                  refreshAll();
                 }}><Text style={{ color: '#fff' }}>Так, видалити</Text></TouchableOpacity>
               </View>
             </View>
@@ -267,10 +225,31 @@ export default function MyLibraryScreen() {
     { key: 'archive', title: 'Архів' }
   ]);
 
+  // Спільний стан для всіх вкладок
+  const [allData, setAllData] = useState({ tasks: [], ideas: [], archive: [] });
+
+  const loadAllData = useCallback(async () => {
+    const t = await DataService.getTasks();
+    const i = await DataService.getIdeas();
+    const a = await DataService.getArchived();
+    setAllData({ tasks: t, ideas: i, archive: a });
+  }, []);
+
+  // Оновлюємо при кожному вході на екран
+  useFocusEffect(useCallback(() => { loadAllData(); }, [loadAllData]));
+
+  const renderScene = ({ route }) => {
+    return <LibraryTab 
+      routeKey={route.key} 
+      data={allData[route.key]} 
+      refreshAll={loadAllData} 
+    />;
+  };
+
   return (
     <TabView
       navigationState={{ index, routes }}
-      renderScene={({ route }) => <LibraryTab routeKey={route.key} />}
+      renderScene={renderScene}
       onIndexChange={setIndex}
       initialLayout={{ width: layout.width }}
       renderTabBar={props => (

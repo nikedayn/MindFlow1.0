@@ -1,5 +1,6 @@
 // src/screens/RawThoughtsScreen.js
-import React, { useState, useCallback, useRef } from 'react';
+// src/screens/RawThoughtsScreen.js
+import React, { useState, useCallback } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -9,107 +10,119 @@ import {
   Modal, 
   TextInput, 
   TouchableWithoutFeedback,
-  Platform
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 
 import DataService from '../data/DataService';
 import { ItemType } from '../constants/types';
 import { useTheme } from '../context/ThemeContext';
 
+// Допоміжна функція для форматування заголовка дати
+const formatDateHeader = (dateString) => {
+  const date = new Date(dateString);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const isSameDay = (d1, d2) => 
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate();
+
+  const options = { month: 'long', day: 'numeric' };
+  if (isSameDay(date, today)) return `Сьогодні, ${date.toLocaleDateString('uk-UA', options)}`;
+  if (isSameDay(date, yesterday)) return `Вчора, ${date.toLocaleDateString('uk-UA', options)}`;
+
+  return date.toLocaleDateString('uk-UA', { year: 'numeric', ...options });
+};
+
+// Функція для перетворення плаского списку у список із заголовками
+const groupThoughtsByDate = (thoughts) => {
+  const grouped = [];
+  let lastDate = null;
+
+  thoughts.forEach((thought) => {
+    const currentDate = new Date(thought.createdAt).toISOString().split('T')[0];
+    if (currentDate !== lastDate) {
+      grouped.push({ id: `header-${currentDate}`, isHeader: true, date: currentDate });
+      lastDate = currentDate;
+    }
+    grouped.push(thought);
+  });
+  return grouped;
+};
+
 export default function RawThoughtsScreen() {
   const { colors } = useTheme();
   const [thoughts, setThoughts] = useState([]);
+  
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [actionsModalVisible, setActionsModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  
   const [selectedItem, setSelectedItem] = useState(null);
   const [editText, setEditText] = useState('');
 
   const loadData = async () => {
     const rawData = await DataService.getRawThoughts();
-    setThoughts(rawData);
+    // Сортуємо за часом (нові зверху) перед групуванням
+    const sorted = rawData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    setThoughts(groupThoughtsByDate(sorted));
   };
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
-  const handleUpdate = async () => {
+  const handleSaveEdit = async () => {
     if (!editText.trim()) return;
     await DataService.updateItem(selectedItem.id, { text: editText.trim() });
     setEditModalVisible(false);
     loadData();
   };
 
-  const renderEmptyComponent = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="chatbubble-ellipses-outline" size={80} color={colors.border} />
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>Поки що тут нічого немає</Text>
-    </View>
-  );
+  const handleQuickAction = async (action) => {
+    setActionsModalVisible(false);
+    if (action === 'archive') await DataService.archiveItem(selectedItem.id);
+    else if (action === 'to_idea') await DataService.convertItem(selectedItem.id, ItemType.IDEA);
+    else if (action === 'to_task') await DataService.convertItem(selectedItem.id, ItemType.TASK);
+    else if (action === 'delete') { setDeleteModalVisible(true); return; }
+    loadData();
+  };
 
-  const ThoughtItem = ({ item }) => {
-    const swipeableRef = useRef(null);
-
-    const closeSwipe = () => swipeableRef.current?.close();
-
-    const renderRightActions = () => (
-      <View style={styles.rightActions}>
-        <TouchableOpacity 
-          style={[styles.actionBtn, { backgroundColor: '#FFB870' }]} 
-          onPress={() => { closeSwipe(); DataService.archiveItem(item.id).then(loadData); }}
-        >
-          <Ionicons name="archive-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.actionBtn, { backgroundColor: colors.error }]} 
-          onPress={() => { closeSwipe(); DataService.deleteItem(item.id).then(loadData); }}
-        >
-          <Ionicons name="trash-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    );
-
-    const renderLeftActions = () => (
-      <View style={styles.leftActions}>
-        <TouchableOpacity 
-          style={[styles.actionBtn, { backgroundColor: '#D0BCFF' }]} 
-          onPress={() => { closeSwipe(); DataService.convertItem(item.id, ItemType.IDEA).then(loadData); }}
-        >
-          <Ionicons name="bulb-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.actionBtn, { backgroundColor: '#B4E09E' }]} 
-          onPress={() => { closeSwipe(); DataService.convertItem(item.id, ItemType.TASK).then(loadData); }}
-        >
-          <Ionicons name="checkbox-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    );
+  const renderItem = ({ item }) => {
+    if (item.isHeader) {
+      return (
+        <View style={styles.headerContainer}>
+          <Text style={[styles.headerText, { color: colors.primary }]}>
+            {formatDateHeader(item.date)}
+          </Text>
+        </View>
+      );
+    }
 
     return (
-      <Swipeable
-        ref={swipeableRef}
-        friction={1} // Менше тертя — легше відкривати
-        overshootLeft={false}
-        overshootRight={false}
-        renderRightActions={renderRightActions}
-        renderLeftActions={renderLeftActions}
+      <TouchableOpacity 
+        activeOpacity={0.7}
+        onPress={() => {
+          setSelectedItem(item);
+          setEditText(item.text);
+          setEditModalVisible(true);
+        }}
+        onLongPress={() => {
+          setSelectedItem(item);
+          setActionsModalVisible(true);
+        }}
+        delayLongPress={300}
+        style={[styles.itemContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >
-        <TouchableOpacity 
-          activeOpacity={0.6}
-          onPress={() => {
-            setSelectedItem(item);
-            setEditText(item.text);
-            setEditModalVisible(true);
-          }}
-          style={[styles.itemContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
+        <View style={styles.textContainer}>
           <Text style={[styles.itemText, { color: colors.text }]}>{item.text}</Text>
-          <Text style={[styles.itemDate, { color: colors.textSecondary }]}>
-            {new Date(item.createdAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
+          <Text style={[styles.itemTime, { color: colors.textSecondary }]}>
+            🕒 {new Date(item.createdAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
           </Text>
-        </TouchableOpacity>
-      </Swipeable>
+        </View>
+        <Ionicons name="ellipsis-vertical" size={18} color={colors.border} />
+      </TouchableOpacity>
     );
   };
 
@@ -118,12 +131,18 @@ export default function RawThoughtsScreen() {
       <FlatList
         data={thoughts}
         keyExtractor={(item) => item.id}
-        ListEmptyComponent={renderEmptyComponent}
-        renderItem={({ item }) => <ThoughtItem item={item} />}
-        contentContainerStyle={{ paddingVertical: 10 }}
+        renderItem={renderItem}
+        contentContainerStyle={thoughts.length === 0 ? { flex: 1 } : { paddingBottom: 40 }}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="chatbubble-ellipses-outline" size={80} color={colors.border} />
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>Поки що порожньо</Text>
+          </View>
+        )}
       />
 
-      <Modal visible={editModalVisible} transparent animationType="fade">
+      {/* MODALS (EDIT, ACTIONS, DELETE) - залишаються такими ж, як у попередній відповіді */}
+      <Modal visible={editModalVisible} transparent animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
         <TouchableWithoutFeedback onPress={() => setEditModalVisible(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
@@ -131,24 +150,69 @@ export default function RawThoughtsScreen() {
                 <Text style={[styles.modalTitle, { color: colors.text }]}>Редагувати</Text>
                 <TextInput 
                   style={[styles.input, { backgroundColor: colors.surfaceVariant, color: colors.text }]} 
-                  multiline 
-                  autoFocus
-                  value={editText} 
-                  onChangeText={setEditText} 
+                  multiline autoFocus value={editText} onChangeText={setEditText} 
                 />
                 <View style={styles.modalButtons}>
                   <TouchableOpacity style={styles.modalBtn} onPress={() => setEditModalVisible(false)}>
                     <Text style={{ color: colors.primary }}>Скасувати</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.modalBtn, { backgroundColor: colors.primary, borderRadius: 12 }]} 
-                    onPress={handleUpdate}
-                  >
-                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Зберегти</Text>
+                  <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.primary, borderRadius: 12 }]} onPress={handleSaveEdit}>
+                    <Text style={{ color: '#fff' }}>Зберегти</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      <Modal visible={actionsModalVisible} transparent animationType="slide" onRequestClose={() => setActionsModalVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setActionsModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalView, styles.bottomSheet, { backgroundColor: colors.card }]}>
+                <View style={styles.dragHandle, { backgroundColor: colors.border }} />
+                <TouchableOpacity style={styles.menuItem} onPress={() => handleQuickAction('to_idea')}>
+                  <Ionicons name="bulb-outline" size={22} color={colors.text} />
+                  <Text style={[styles.menuText, { color: colors.text }]}>Зробити ідеєю</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={() => handleQuickAction('to_task')}>
+                  <Ionicons name="checkbox-outline" size={22} color={colors.text} />
+                  <Text style={[styles.menuText, { color: colors.text }]}>Зробити справою</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={() => handleQuickAction('archive')}>
+                  <Ionicons name="archive-outline" size={22} color={colors.text} />
+                  <Text style={[styles.menuText, { color: colors.text }]}>В архів</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={() => handleQuickAction('delete')}>
+                  <Ionicons name="trash-outline" size={22} color={colors.error} />
+                  <Text style={[styles.menuText, { color: colors.error }]}>Видалити</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      <Modal visible={deleteModalVisible} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={() => setDeleteModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalView, { backgroundColor: colors.card }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Видалити?</Text>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.modalBtn} onPress={() => setDeleteModalVisible(false)}><Text style={{ color: colors.primary }}>Ні</Text></TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.modalBtn, { backgroundColor: colors.error, borderRadius: 12 }]} 
+                  onPress={async () => {
+                    await DataService.deleteItem(selectedItem.id);
+                    setDeleteModalVisible(false);
+                    loadData();
+                  }}
+                >
+                  <Text style={{ color: '#fff' }}>Так</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </TouchableWithoutFeedback>
       </Modal>
@@ -158,81 +222,22 @@ export default function RawThoughtsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  itemContainer: { 
-    padding: 16, 
-    marginHorizontal: 16, 
-    marginVertical: 4, 
-    borderRadius: 16, 
-    borderWidth: 1,
-    elevation: 2, // Додаємо тінь для Android, щоб бачити межі
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  itemText: { fontSize: 16, lineHeight: 24 },
-  itemDate: { fontSize: 11, marginTop: 4, textAlign: 'right' },
-  rightActions: { 
-    flexDirection: 'row', 
-    width: 140, 
-    marginVertical: 4, 
-    paddingRight: 16 
-  },
-  leftActions: { 
-    flexDirection: 'row', 
-    width: 140, 
-    marginVertical: 4, 
-    paddingLeft: 16 
-  },
-  actionBtn: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    borderRadius: 16, 
-    marginHorizontal: 4 
-  },
-  modalOverlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.5)', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
-  modalView: { 
-    width: '85%', 
-    borderRadius: 28, 
-    padding: 24 
-  },
-  modalTitle: { 
-    fontSize: 20, 
-    fontWeight: '700', 
-    marginBottom: 16 
-  },
-  input: { 
-    borderRadius: 12, 
-    padding: 12, 
-    minHeight: 100, 
-    textAlignVertical: 'top', 
-    fontSize: 16 
-  },
-  modalButtons: { 
-    flexDirection: 'row', 
-    justifyContent: 'flex-end', 
-    marginTop: 20 
-  },
-  modalBtn: { 
-    padding: 12, 
-    paddingHorizontal: 20, 
-    marginLeft: 8 
-  },
-  emptyContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    paddingTop: 100 
-  },
-  emptyTitle: { 
-    fontSize: 18, 
-    marginTop: 16, 
-    fontWeight: '600' 
-  },
+  headerContainer: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 },
+  headerText: { fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  itemContainer: { padding: 16, marginHorizontal: 16, marginVertical: 4, borderRadius: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center' },
+  textContainer: { flex: 1 },
+  itemText: { fontSize: 16, lineHeight: 22 },
+  itemTime: { fontSize: 12, marginTop: 6 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalView: { width: '85%', borderRadius: 28, padding: 24 },
+  bottomSheet: { width: '100%', position: 'absolute', bottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 40 },
+  dragHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16, textAlign: 'center' },
+  input: { borderRadius: 12, padding: 12, minHeight: 100, textAlignVertical: 'top', fontSize: 16 },
+  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 24 },
+  modalBtn: { paddingHorizontal: 20, paddingVertical: 10, marginLeft: 8 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 8 },
+  menuText: { fontSize: 16, marginLeft: 16, fontWeight: '500' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyTitle: { fontSize: 18, marginTop: 16, fontWeight: '600' }
 });
