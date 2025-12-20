@@ -9,7 +9,8 @@ import {
   Modal, 
   TextInput, 
   Platform,
-  Animated
+  Animated,
+  TouchableWithoutFeedback
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -54,12 +55,10 @@ const groupThoughtsByDate = (thoughts) => {
 
 const ThoughtItem = ({ item, onSwipeLeft, onSwipeRight }) => {
   const renderRightActions = (progress) => {
-    // Кнопки почнуть з'являтися тільки після того, як свайп пройде 20% шляху
     const opacity = progress.interpolate({
       inputRange: [0, 0.2, 1],
       outputRange: [0, 0, 1],
     });
-
     const scale = progress.interpolate({
       inputRange: [0, 0.5, 1],
       outputRange: [0.8, 0.9, 1],
@@ -74,7 +73,6 @@ const ThoughtItem = ({ item, onSwipeLeft, onSwipeRight }) => {
           >
             <Ionicons name="archive-outline" size={22} color="#fff" />
           </TouchableOpacity>
-          
           <TouchableOpacity 
             style={[styles.actionButton, styles.deleteBtn]} 
             onPress={() => onSwipeRight('delete', item)}
@@ -91,7 +89,6 @@ const ThoughtItem = ({ item, onSwipeLeft, onSwipeRight }) => {
       inputRange: [0, 0.2, 1],
       outputRange: [0, 0, 1],
     });
-
     const scale = progress.interpolate({
       inputRange: [0, 0.5, 1],
       outputRange: [0.8, 0.9, 1],
@@ -106,7 +103,6 @@ const ThoughtItem = ({ item, onSwipeLeft, onSwipeRight }) => {
           >
             <Ionicons name="bulb-outline" size={22} color="#fff" />
           </TouchableOpacity>
-          
           <TouchableOpacity 
             style={[styles.actionButton, styles.taskBtn]} 
             onPress={() => onSwipeLeft('task', item)}
@@ -122,10 +118,9 @@ const ThoughtItem = ({ item, onSwipeLeft, onSwipeRight }) => {
     <Swipeable 
       renderRightActions={renderRightActions} 
       renderLeftActions={renderLeftActions}
-      friction={2} // Більше значення = важче "тягнути", прибирає дрижання
-      overshootRight={false} // Забороняє кнопкам вилітати занадто далеко
+      friction={2}
+      overshootRight={false}
       overshootLeft={false}
-      dragOffsetFromStart={10} // Свайп почнеться тільки після зсуву на 10 пікселів
     >
       <View style={styles.itemContainer}>
         <Text style={styles.itemText}>{item.text}</Text>
@@ -144,7 +139,7 @@ export default function RawThoughtsScreen() {
   const [editText, setEditText] = useState('');
   const [editTag, setEditTag] = useState('');
   const [dueDate, setDueDate] = useState(new Date());
-  const [hasDueDate, setHasDueDate] = useState(false); // Перемикач дати
+  const [hasDueDate, setHasDueDate] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
@@ -156,8 +151,11 @@ export default function RawThoughtsScreen() {
 
   const handleSwipeRight = (action, item) => {
     setSelectedItem(item);
-    if (action === 'archive') { DataService.archiveItem(item.id).then(loadData); }
-    else { setDeleteModalVisible(true); }
+    if (action === 'archive') { 
+      DataService.archiveItem(item.id).then(loadData); 
+    } else { 
+      setDeleteModalVisible(true); 
+    }
   };
 
   const handleSwipeLeft = (type, item) => {
@@ -183,61 +181,92 @@ export default function RawThoughtsScreen() {
     loadData();
   };
 
+  // Компонент заглушки
+  const renderEmptyComponent = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="chatbubble-ellipses-outline" size={80} color="#CAC4D0" />
+      <Text style={styles.emptyTitle}>Поки що тут нічого немає</Text>
+      <Text style={styles.emptySubtitle}>Ваші миттєві думки з'являться тут після того, як ви відпустите їх на головному екрані.</Text>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <FlatList
         data={thoughts}
         keyExtractor={(item) => item.id}
+        ListEmptyComponent={renderEmptyComponent}
         renderItem={({ item }) => item.isHeader ? 
           <View style={styles.headerGap}><Text style={styles.dateHeaderText}>{formatDateHeader(item.date)}</Text></View> : 
           <ThoughtItem item={item} onSwipeRight={handleSwipeRight} onSwipeLeft={handleSwipeLeft} />
         }
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={thoughts.length === 0 ? { flex: 1 } : { paddingBottom: 40 }}
       />
 
-      <Modal animationType="fade" transparent visible={convertModalVisible}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalView}>
-            <Text style={styles.modalTitle}>{targetType === 'task' ? 'Нова справа' : 'Нова ідея'}</Text>
-            <TextInput style={[styles.input, styles.textArea]} multiline value={editText} onChangeText={setEditText} />
-            <TextInput style={[styles.input, {marginTop: 12}]} placeholder="Тег" value={editTag} onChangeText={setEditTag} placeholderTextColor="#938F99" />
-            
-            {targetType === 'task' && (
-              <View style={{marginTop: 12}}>
-                <TouchableOpacity style={styles.dateButton} onPress={() => setHasDueDate(!hasDueDate)}>
-                  <Text style={{color: '#1C1B1F'}}>{hasDueDate ? `Дата: ${dueDate.toLocaleDateString()}` : "Без терміну"}</Text>
-                  <Ionicons name={hasDueDate ? "calendar" : "calendar-outline"} size={20} color="#6750A4" />
-                </TouchableOpacity>
-                {hasDueDate && (
-                  <TouchableOpacity onPress={() => setShowDatePicker(true)} style={{marginTop: 8}}><Text style={{color: '#6750A4', textAlign: 'center'}}>Змінити дату</Text></TouchableOpacity>
+      {/* МОДАЛ ПЕРЕТВОРЕННЯ */}
+      <Modal 
+        animationType="slide" 
+        transparent 
+        visible={convertModalVisible}
+        onRequestClose={() => setConvertModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setConvertModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalView, styles.bottomSheet]}>
+                <View style={styles.dragHandle} />
+                <Text style={styles.modalTitle}>{targetType === 'task' ? 'Миттєва справа' : 'Миттєва ідея'}</Text>
+                <TextInput style={[styles.input, styles.textArea]} multiline value={editText} onChangeText={setEditText} />
+                <TextInput style={[styles.input, {marginTop: 12}]} placeholder="Тег" value={editTag} onChangeText={setEditTag} placeholderTextColor="#938F99" />
+                
+                {targetType === 'task' && (
+                  <View style={{marginTop: 12}}>
+                    <TouchableOpacity style={styles.dateButton} onPress={() => setHasDueDate(!hasDueDate)}>
+                      <Text style={{color: '#1C1B1F'}}>{hasDueDate ? `Дата: ${dueDate.toLocaleDateString()}` : "Без терміну"}</Text>
+                      <Ionicons name={hasDueDate ? "calendar" : "calendar-outline"} size={20} color="#6750A4" />
+                    </TouchableOpacity>
+                    {hasDueDate && (
+                      <TouchableOpacity onPress={() => setShowDatePicker(true)} style={{marginTop: 8}}><Text style={{color: '#6750A4', textAlign: 'center'}}>Змінити дату</Text></TouchableOpacity>
+                    )}
+                  </View>
                 )}
+
+                {showDatePicker && (
+                  <DateTimePicker value={dueDate} mode="date" onChange={(e, d) => { setShowDatePicker(false); if(d) setDueDate(d); }} />
+                )}
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={styles.modalBtn} onPress={() => setConvertModalVisible(false)}><Text style={styles.cancelBtnText}>Скасувати</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.modalBtn, styles.saveBtn]} onPress={handleConvert}><Text style={styles.saveBtnText}>Зберегти</Text></TouchableOpacity>
+                </View>
               </View>
-            )}
-
-            {showDatePicker && (
-              <DateTimePicker value={dueDate} mode="date" onChange={(e, d) => { setShowDatePicker(false); if(d) setDueDate(d); }} />
-            )}
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalBtn} onPress={() => setConvertModalVisible(false)}><Text style={styles.cancelBtnText}>Скасувати</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, styles.saveBtn]} onPress={handleConvert}><Text style={styles.saveBtnText}>Зберегти</Text></TouchableOpacity>
-            </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
-      <Modal animationType="fade" transparent visible={deleteModalVisible}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalView}>
-            <Ionicons name="trash-outline" size={28} color="#B3261E" style={{alignSelf: 'center', marginBottom: 16}} />
-            <Text style={styles.modalTitle}>Видалити?</Text>
-            <Text style={styles.modalText}>Цю дію неможливо скасувати.</Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalBtn} onPress={() => setDeleteModalVisible(false)}><Text style={styles.cancelBtnText}>Скасувати</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, styles.deleteConfirmBtn]} onPress={async () => { await DataService.deleteItem(selectedItem.id); setDeleteModalVisible(false); loadData(); }}><Text style={styles.saveBtnText}>Видалити</Text></TouchableOpacity>
-            </View>
+      {/* МОДАЛ ВИДАЛЕННЯ */}
+      <Modal 
+        animationType="fade" 
+        transparent 
+        visible={deleteModalVisible}
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setDeleteModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.modalView}>
+                <Ionicons name="trash-outline" size={28} color="#B3261E" style={{alignSelf: 'center', marginBottom: 16}} />
+                <Text style={styles.modalTitle}>Видалити?</Text>
+                <Text style={styles.modalText}>Цю дію неможливо скасувати.</Text>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={styles.modalBtn} onPress={() => setDeleteModalVisible(false)}><Text style={styles.cancelBtnText}>Скасувати</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.modalBtn, styles.deleteConfirmBtn]} onPress={async () => { await DataService.deleteItem(selectedItem.id); setDeleteModalVisible(false); loadData(); }}><Text style={styles.saveBtnText}>Видалити</Text></TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </View>
   );
@@ -257,6 +286,8 @@ const styles = StyleSheet.create({
   ideaBtn: { backgroundColor: '#D0BCFF' }, taskBtn: { backgroundColor: '#B4E09E' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.32)', justifyContent: 'center', alignItems: 'center' },
   modalView: { width: '85%', backgroundColor: '#F7F2FA', borderRadius: 28, padding: 24, elevation: 6 },
+  bottomSheet: { width: '100%', position: 'absolute', bottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 40 },
+  dragHandle: { width: 40, height: 4, backgroundColor: '#CAC4D0', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 24, color: '#1C1B1F', textAlign: 'center', marginBottom: 16 },
   modalText: { fontSize: 16, color: '#49454F', textAlign: 'center', marginBottom: 24 },
   input: { backgroundColor: '#ECE6F0', borderRadius: 4, borderBottomWidth: 1, borderBottomColor: '#49454F', padding: 12, fontSize: 16, color: '#1C1B1F' },
@@ -266,4 +297,9 @@ const styles = StyleSheet.create({
   modalBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 100, marginLeft: 8 },
   saveBtn: { backgroundColor: '#6750A4' }, deleteConfirmBtn: { backgroundColor: '#B3261E' },
   saveBtnText: { color: '#FFF', fontWeight: '500' }, cancelBtnText: { color: '#6750A4', fontWeight: '500' },
+  
+  // Стилі заглушки
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
+  emptyTitle: { fontSize: 20, fontWeight: '600', color: '#1C1B1F', marginTop: 20, textAlign: 'center' },
+  emptySubtitle: { fontSize: 14, color: '#49454F', textAlign: 'center', marginTop: 10, lineHeight: 20 },
 });
