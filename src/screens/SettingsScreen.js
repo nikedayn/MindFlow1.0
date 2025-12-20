@@ -96,7 +96,7 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* КУСТОМНЕ MATERIAL 3 МОДАЛЬНЕ ВІКНО ВИДАЛЕННЯ */}
+      {/* КАСТОМНЕ MATERIAL 3 МОДАЛЬНЕ ВІКНО ВИДАЛЕННЯ */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   textWrapper: { flex: 1 },
   rowTitle: { fontSize: 16, color: '#1C1B1F', fontWeight: '500' },
   rowSubtitle: { fontSize: 14, color: '#49454F', marginTop: 2 },
-  divider: { height: 1, backgroundColor: '#CAC4D0', marginLeft: 72 },
+  divider: { height: 1, width: '95%', backgroundColor: '#CAC4D0', alignSelf: 'center'},
   
   // Стилі модального вікна M3
   modalOverlay: {
