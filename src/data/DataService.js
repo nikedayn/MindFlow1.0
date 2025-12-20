@@ -166,6 +166,15 @@ class DataService {
         const updatedItems = [newItem, ...currentItems];
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedItems));
     }
+
+    static async updateRawThought(id, newText) {
+        const thoughts = await this.getRawThoughts();
+        const index = thoughts.findIndex(t => t.id === id);
+        if (index !== -1) {
+            thoughts[index].text = newText;
+            await AsyncStorage.setItem('raw_thoughts', JSON.stringify(thoughts));
+        }
+    }
 }
 
 export default new DataService();

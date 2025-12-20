@@ -1,15 +1,76 @@
 // src/screens/MyLibraryScreen.js
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, useWindowDimensions } from 'react-native';
+import { 
+  StyleSheet, 
+  Text, 
+  View, 
+  FlatList, 
+  TouchableOpacity, 
+  Modal,
+  TextInput,
+  useWindowDimensions,
+  TouchableWithoutFeedback 
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { TabView, TabBar } from 'react-native-tab-view';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { TabView, TabBar } from 'react-native-tab-view'; 
+
 import DataService from '../data/DataService';
+import { ItemType } from '../constants/types';
 import { useTheme } from '../context/ThemeContext';
 
-const LibraryTab = ({ routeKey, refreshCounter, onDataChange }) => {
+const LibraryItem = ({ item, type, onToggleComplete, onPressItem, onLongPressItem, colors }) => (
+  <TouchableOpacity 
+    style={[styles.itemContainer, { backgroundColor: colors.surface, borderColor: colors.border }]} 
+    onPress={() => onPressItem(item)} 
+    onLongPress={() => onLongPressItem(item)} 
+    activeOpacity={0.7}
+    delayLongPress={300}
+  >
+    {type === 'tasks' && (
+      <TouchableOpacity onPress={() => onToggleComplete(item)} style={styles.checkboxContainer}>
+        <Ionicons 
+          name={item.isCompleted ? "checkmark-circle" : "ellipse-outline"} 
+          size={26} 
+          color={item.isCompleted ? colors.primary : colors.textSecondary} 
+        />
+      </TouchableOpacity>
+    )}
+    <View style={styles.textContainer}>
+      <Text style={[styles.itemText, { color: colors.text }, (item.isCompleted && type === 'tasks') && styles.completedText]}>
+        {item.text}
+      </Text>
+      <View style={styles.metaContainer}>
+        {item.tag && (
+          <View style={[styles.tagBadge, { backgroundColor: colors.primary + '20' }]}>
+            <Text style={[styles.tagText, { color: colors.primary }]}>#{item.tag}</Text>
+          </View>
+        )}
+        {item.dueDate && type === 'tasks' && (
+          <Text style={[styles.dateText, { color: colors.textSecondary }]}>
+            📅 {new Date(item.dueDate).toLocaleDateString()}
+          </Text>
+        )}
+      </View>
+    </View>
+    <Ionicons name="chevron-forward" size={20} color={colors.border} />
+  </TouchableOpacity>
+);
+
+const LibraryTab = ({ routeKey }) => {
   const { colors } = useTheme();
   const [data, setData] = useState([]);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [actionsModalVisible, setActionsModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  
+  const [editText, setEditText] = useState('');
+  const [editTag, setEditTag] = useState('');
+  const [editDate, setEditDate] = useState(new Date());
+  const [hasDueDate, setHasDueDate] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const loadData = useCallback(async () => {
     let result = [];
@@ -21,39 +82,177 @@ const LibraryTab = ({ routeKey, refreshCounter, onDataChange }) => {
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  const renderEmpty = () => {
-    const config = {
-        tasks: { icon: 'checkbox-outline', title: 'Немає справ', sub: 'Ваші завдання з’являться тут.' },
-        ideas: { icon: 'bulb-outline', title: 'Жодної ідеї', sub: 'Зберігайте сюди все, що надихає.' },
-        archive: { icon: 'archive-outline', title: 'Архів порожній', sub: 'Тут будуть заархівовані думки.' }
-    }[routeKey];
+  const openEdit = (item) => {
+    setSelectedItem(item);
+    setEditText(item.text);
+    setEditTag(item.tag || '');
+    setEditDate(item.dueDate ? new Date(item.dueDate) : new Date());
+    setHasDueDate(!!item.dueDate);
+    setEditModalVisible(true);
+  };
 
-    return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name={config.icon} size={80} color={colors.border} />
-        <Text style={[styles.emptyTitle, { color: colors.text }]}>{config.title}</Text>
-        <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>{config.sub}</Text>
-      </View>
-    );
+  const handleSaveEdit = async () => {
+    const updates = {
+      text: editText,
+      tag: editTag.trim() || null,
+      dueDate: (selectedItem.type === ItemType.TASK && hasDueDate) ? editDate.toISOString() : null
+    };
+    await DataService.updateItem(selectedItem.id, updates);
+    setEditModalVisible(false);
+    loadData();
+  };
+
+  const handleQuickAction = async (action) => {
+    setActionsModalVisible(false);
+    if (action === 'archive') await DataService.archiveItem(selectedItem.id);
+    else if (action === 'restore') await DataService.updateItem(selectedItem.id, { status: 'active' });
+    else if (action === 'convert') {
+      const newType = selectedItem.type === ItemType.TASK ? ItemType.IDEA : ItemType.TASK;
+      // При конвертації скидаємо дату, якщо це перетворення на ідею
+      await DataService.convertItem(selectedItem.id, newType, { dueDate: null });
+    } else if (action === 'delete') { setDeleteModalVisible(true); return; }
+    loadData();
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <FlatList
-        data={data}
-        keyExtractor={item => item.id}
-        ListEmptyComponent={renderEmpty}
-        contentContainerStyle={data.length === 0 ? { flex: 1 } : { padding: 16 }}
+    <View style={[styles.sceneContainer, { backgroundColor: colors.background }]}>
+      <FlatList 
+        data={data} 
+        keyExtractor={item => item.id} 
         renderItem={({ item }) => (
-          <TouchableOpacity style={[styles.item, {backgroundColor: colors.surface, borderColor: colors.border}]}>
-            <View style={{flex: 1}}>
-                <Text style={[styles.itemText, {color: colors.text}, item.isCompleted && {textDecorationLine: 'line-through', opacity: 0.5}]}>{item.text}</Text>
-                {item.tag && <Text style={{color: colors.primary, fontSize: 12, marginTop: 4}}>#{item.tag}</Text>}
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.border} />
-          </TouchableOpacity>
+          <LibraryItem 
+            item={item} 
+            type={routeKey} 
+            colors={colors}
+            onPressItem={openEdit} 
+            onLongPressItem={(i) => {setSelectedItem(i); setActionsModalVisible(true);}} 
+            onToggleComplete={async (i) => { await DataService.updateItem(i.id, { isCompleted: !i.isCompleted }); loadData(); }} 
+          />
         )}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="book-outline" size={80} color={colors.border} />
+            <Text style={[styles.emptyTitle, {color: colors.text}]}>Поки що порожньо</Text>
+          </View>
+        )}
+        contentContainerStyle={data.length === 0 ? { flex: 1 } : { paddingVertical: 12 }} 
       />
+
+      {/* РЕДАГУВАННЯ */}
+      <Modal visible={editModalVisible} transparent animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setEditModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalView, { backgroundColor: colors.card }]}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Редагувати</Text>
+                
+                <TextInput 
+                  style={[styles.input, { backgroundColor: colors.surfaceVariant, color: colors.text }]} 
+                  multiline 
+                  value={editText} 
+                  onChangeText={setEditText} 
+                />
+                
+                <TextInput 
+                  style={[styles.input, { backgroundColor: colors.surfaceVariant, color: colors.text, marginTop: 12, minHeight: 45 }]} 
+                  placeholder="Тег (напр. робота)"
+                  placeholderTextColor={colors.textSecondary}
+                  value={editTag} 
+                  onChangeText={setEditTag} 
+                />
+
+                {selectedItem?.type === ItemType.TASK && (
+                  <View style={{marginTop: 16}}>
+                    <TouchableOpacity 
+                      style={[styles.dateToggle, { backgroundColor: colors.surfaceVariant }]} 
+                      onPress={() => setHasDueDate(!hasDueDate)}
+                    >
+                      <Text style={{color: colors.text}}>{hasDueDate ? `📅 ${editDate.toLocaleDateString()}` : "Без терміну"}</Text>
+                      <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                    {hasDueDate && (
+                      <TouchableOpacity onPress={() => setShowDatePicker(true)} style={{marginTop: 8}}>
+                        <Text style={{color: colors.primary, textAlign: 'center'}}>Змінити дату</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {showDatePicker && (
+                  <DateTimePicker 
+                    value={editDate} 
+                    mode="date" 
+                    onChange={(e, d) => { setShowDatePicker(false); if(d) setEditDate(d); }} 
+                  />
+                )}
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={styles.modalBtn} onPress={() => setEditModalVisible(false)}>
+                    <Text style={{ color: colors.primary }}>Скасувати</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.modalBtn, { backgroundColor: colors.primary }]} 
+                    onPress={handleSaveEdit}
+                  >
+                    <Text style={{ color: '#fff' }}>Зберегти</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* МЕНЮ ДІЙ (CONTEXT MENU) */}
+      <Modal visible={actionsModalVisible} transparent animationType="slide" onRequestClose={() => setActionsModalVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setActionsModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalView, styles.bottomSheet, { backgroundColor: colors.card }]}>
+                <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
+                
+                <TouchableOpacity style={styles.menuItem} onPress={() => handleQuickAction(routeKey === 'archive' ? 'restore' : 'archive')}>
+                  <Ionicons name={routeKey === 'archive' ? "refresh-outline" : "archive-outline"} size={22} color={colors.text} />
+                  <Text style={[styles.menuText, { color: colors.text }]}>{routeKey === 'archive' ? 'Відновити' : 'В архів'}</Text>
+                </TouchableOpacity>
+
+                {routeKey !== 'archive' && (
+                  <TouchableOpacity style={styles.menuItem} onPress={() => handleQuickAction('convert')}>
+                    <Ionicons name={selectedItem?.type === ItemType.TASK ? "bulb-outline" : "checkbox-outline"} size={22} color={colors.text} />
+                    <Text style={[styles.menuText, { color: colors.text }]}>
+                      {selectedItem?.type === ItemType.TASK ? 'Зробити ідеєю' : 'Зробити справою'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity style={styles.menuItem} onPress={() => handleQuickAction('delete')}>
+                  <Ionicons name="trash-outline" size={22} color={colors.error} />
+                  <Text style={[styles.menuText, { color: colors.error }]}>Видалити назавжди</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* МОДАЛ ВИДАЛЕННЯ */}
+      <Modal visible={deleteModalVisible} transparent animationType="fade" onRequestClose={() => setDeleteModalVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setDeleteModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalView, { backgroundColor: colors.card }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Видалити запис?</Text>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.modalBtn} onPress={() => setDeleteModalVisible(false)}><Text style={{ color: colors.primary }}>Ні</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.error }]} onPress={async () => {
+                  await DataService.deleteItem(selectedItem.id);
+                  setDeleteModalVisible(false);
+                  loadData();
+                }}><Text style={{ color: '#fff' }}>Так, видалити</Text></TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 };
@@ -63,35 +262,53 @@ export default function MyLibraryScreen() {
   const { colors } = useTheme();
   const [index, setIndex] = useState(0);
   const [routes] = useState([
-    { key: 'tasks', title: 'Справи' },
-    { key: 'ideas', title: 'Ідеї' },
-    { key: 'archive', title: 'Архів' },
+    { key: 'tasks', title: 'Справи' }, 
+    { key: 'ideas', title: 'Ідеї' }, 
+    { key: 'archive', title: 'Архів' }
   ]);
 
   return (
     <TabView
       navigationState={{ index, routes }}
+      renderScene={({ route }) => <LibraryTab routeKey={route.key} />}
       onIndexChange={setIndex}
       initialLayout={{ width: layout.width }}
       renderTabBar={props => (
-        <TabBar
-          {...props}
-          indicatorStyle={{ backgroundColor: colors.primary, height: 3 }}
-          style={{ backgroundColor: colors.background, elevation: 0, borderBottomWidth: 1, borderBottomColor: colors.border }}
-          activeColor={colors.primary}
-          inactiveColor={colors.textSecondary}
-          labelStyle={{ fontWeight: '700', textTransform: 'none' }}
+        <TabBar 
+          {...props} 
+          indicatorStyle={{ backgroundColor: colors.primary, height: 3 }} 
+          style={{ backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.border, elevation: 0 }} 
+          activeColor={colors.primary} 
+          inactiveColor={colors.textSecondary} 
+          labelStyle={{ fontWeight: '700', textTransform: 'none' }} 
         />
       )}
-      renderScene={({ route }) => <LibraryTab routeKey={route.key} />}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyTitle: { fontSize: 20, fontWeight: '600', marginTop: 16 },
-  emptySubtitle: { fontSize: 14, textAlign: 'center', marginTop: 8 },
-  item: { padding: 16, borderRadius: 16, borderWidth: 1, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
-  itemText: { fontSize: 16 }
+  sceneContainer: { flex: 1 },
+  itemContainer: { padding: 16, marginHorizontal: 16, marginVertical: 4, borderRadius: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1 },
+  checkboxContainer: { marginRight: 12 },
+  textContainer: { flex: 1 },
+  itemText: { fontSize: 16, lineHeight: 22 },
+  completedText: { textDecorationLine: 'line-through', opacity: 0.5 },
+  metaContainer: { flexDirection: 'row', marginTop: 8, alignItems: 'center', flexWrap: 'wrap' },
+  tagBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginRight: 12 },
+  tagText: { fontSize: 12, fontWeight: '600' },
+  dateText: { fontSize: 12 },
+  dateToggle: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderRadius: 12 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalView: { width: '85%', borderRadius: 28, padding: 24, elevation: 6 },
+  bottomSheet: { width: '100%', position: 'absolute', bottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 40 },
+  dragHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16, textAlign: 'center' },
+  input: { borderRadius: 12, padding: 12, minHeight: 80, textAlignVertical: 'top', fontSize: 16 },
+  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 24 },
+  modalBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 100, marginLeft: 8 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 8 },
+  menuText: { fontSize: 16, marginLeft: 16, fontWeight: '500' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyTitle: { fontSize: 18, marginTop: 16, fontWeight: '600' }
 });

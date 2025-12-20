@@ -1,5 +1,4 @@
 // src/screens/HomeScreen.js
-// src/screens/HomeScreen.js
 import React, { useState } from 'react';
 import { 
   StyleSheet, 
@@ -20,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import DataService from '../data/DataService';
 import { ItemType } from '../constants/types';
-import { useTheme } from '../context/ThemeContext'; // Використання контексту теми
+import { useTheme } from '../context/ThemeContext';
 
 import AdaptiveIcon from '../../assets/adaptive-icon.png';
 
@@ -28,7 +27,7 @@ export default function HomeScreen({ navigation }) {
   const [thought, setThought] = useState('');
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
-  const { colors } = useTheme(); // Отримуємо динамічні кольори теми
+  const { colors } = useTheme();
 
   const finishAction = () => {
     setThought('');
@@ -36,7 +35,6 @@ export default function HomeScreen({ navigation }) {
     setSuccessModalVisible(true);
   };
 
-  // 1. Коротке натискання — зберігає у "Миттєві думки"
   const handleReleaseRaw = async () => {
     if (thought.trim().length === 0) return;
     try {
@@ -47,7 +45,6 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  // 2. Довге натискання — відкриває меню вибору
   const handleLongPress = () => {
     if (thought.trim().length === 0) return;
     Keyboard.dismiss();
@@ -65,11 +62,11 @@ export default function HomeScreen({ navigation }) {
   };
 
   return (
-    // Базовий View з фоном теми для усунення білих спалахів
+    // Зовнішній View з colors.background ПРИБИРАЄ спалахи та затемнення
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView style={styles.container}>
         
-        {/* МОДАЛ УСПІХУ (Закривається жестом Назад) */}
+        {/* MODAL SUCCESS */}
         <Modal 
           animationType="fade" 
           transparent 
@@ -97,7 +94,7 @@ export default function HomeScreen({ navigation }) {
           </TouchableWithoutFeedback>
         </Modal>
 
-        {/* МЕНЮ ВИБОРУ (Long Press) - Закривається жестом Назад або тапом по фону */}
+        {/* MODAL ACTION MENU */}
         <Modal 
           animationType="slide" 
           transparent 
@@ -133,11 +130,13 @@ export default function HomeScreen({ navigation }) {
           </TouchableWithoutFeedback>
         </Modal>
 
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : null} style={{ flex: 1 }}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : null} 
+          style={{ flex: 1 }}
+        >
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.contentContainer}>
               
-              {/* HEADER */}
               <View style={styles.header}>
                 <View style={styles.logoContainer}>
                   <Image source={AdaptiveIcon} style={styles.logoImage} resizeMode="contain" />
@@ -148,7 +147,6 @@ export default function HomeScreen({ navigation }) {
                 </TouchableOpacity>
               </View>
 
-              {/* MAIN CONTENT */}
               <View style={styles.mainContent}>
                 <ScrollView 
                   contentContainerStyle={styles.scrollContent} 
@@ -182,7 +180,6 @@ export default function HomeScreen({ navigation }) {
                 </ScrollView>
               </View>
 
-              {/* FOOTER */}
               <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
                 <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('RawThoughts')}>
                   <Ionicons name="list-outline" size={24} color={colors.primary} />
@@ -211,7 +208,7 @@ const styles = StyleSheet.create({
   logoImage: { width: 32, height: 32 },
   appName: { fontSize: 22, fontWeight: '600', marginLeft: 10 },
   mainContent: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 30, paddingVertical: 20 },
+  scrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 30 },
   slogan: { fontSize: 32, fontWeight: '300', marginBottom: 8, textAlign: 'center' },
   subtext: { fontSize: 16, marginBottom: 32, textAlign: 'center' },
   inputWrapper: { width: '100%', borderRadius: 28, padding: 16, height: 140, marginBottom: 24, borderWidth: 1 },
