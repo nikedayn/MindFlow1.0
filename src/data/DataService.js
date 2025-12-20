@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ItemType, ItemStatus } from '../constants/types';
 
 const STORAGE_KEY = '@mindflow_items'; 
+const THEME_KEY = '@theme_mode'; // Ключ для збереження теми
 
 // Допоміжна функція для генерації унікального ID
 const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
@@ -16,6 +17,24 @@ class DataService {
         } catch(e) {
             console.error("Помилка читання даних: ", e);
             return [];
+        }
+    }
+
+    // === НАЛАШТУВАННЯ ТЕМИ ===
+
+    async setTheme(theme) {
+        try {
+            await AsyncStorage.setItem(THEME_KEY, theme);
+        } catch (e) {
+            console.error("Помилка збереження теми: ", e);
+        }
+    }
+
+    async getTheme() {
+        try {
+            return await AsyncStorage.getItem(THEME_KEY) || 'system';
+        } catch (e) {
+            return 'system';
         }
     }
 
@@ -46,7 +65,7 @@ class DataService {
 
     // === СТВОРЕННЯ ДАНИХ ===
 
-    // Додати нову "Сиру думку"
+    // Додати нову "Миттєву думку"
     async addRawThought(text) {
         const newItem = {
             id: generateId(),
@@ -62,7 +81,23 @@ class DataService {
         return newItem;
     }
 
-    // Перетворити думку на Справу або Ідею
+    // Створення прямого запису певного типу (для Long Press на головній або FAB у бібліотеці)
+    async addTypedItem(type, updates = {}) {
+        const newItem = {
+            id: generateId(),
+            type: type, // ItemType.TASK або ItemType.IDEA
+            status: ItemStatus.ACTIVE,
+            createdAt: new Date().toISOString(),
+            text: updates.text || '',
+            tag: updates.tag || null,
+            dueDate: updates.dueDate || null, 
+            isCompleted: updates.isCompleted || false,
+        };
+        await this._saveItem(newItem);
+        return newItem;
+    }
+
+    // Перетворити існуючий елемент
     async convertItem(id, newType, updates = {}) {
         const allItems = await this.getAllItems();
         const updatedItems = allItems.map(item => {
@@ -70,32 +105,14 @@ class DataService {
                 return { 
                     ...item, 
                     type: newType, 
-                    status: ItemStatus.ACTIVE, // Повертаємо в активні, якщо була в архіві
-                    ...updates // Наприклад: { dueDate: '...', tag: '...' }
+                    status: ItemStatus.ACTIVE,
+                    ...updates 
                 };
             }
             return item;
         });
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedItems));
     }
-
-    // === СТВОРЕННЯ ДАНИХ (для прямого додавання Справи/Ідеї) ===
-    async addTypedItem(type, updates = {}) {
-        const newItem = {
-            id: generateId(),
-            type: type, // ItemType.TASK або ItemType.IDEA
-            status: ItemStatus.ACTIVE,
-            createdAt: new Date().toISOString(),
-            // Використовуємо дані з updates, або значення за замовчуванням
-            dueDate: updates.dueDate || null, 
-            isCompleted: updates.isCompleted || false,
-            tag: updates.tag || null,
-            text: updates.text || '',
-        };
-        await this._saveItem(newItem);
-        return newItem;
-    }
-    // === КІНЕЦЬ СТВОРЕННЯ ДАНИХ ===
 
     // === ОНОВЛЕННЯ ТА ВИДАЛЕННЯ ===
 
@@ -120,7 +137,7 @@ class DataService {
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedItems));
     }
 
-    // === СЛУЖБОВІ ФУНКЦІЇ (ДЛЯ Settings) ===
+    // === СЛУЖБОВІ ФУНКЦІЇ ===
 
     async clearAllData() {
         await AsyncStorage.removeItem(STORAGE_KEY);
@@ -135,7 +152,7 @@ class DataService {
             }
             return false;
         } catch (e) {
-            console.error("Помилка імпорту даних: ", e);
+            console.error("Помилка імпорту: ", e);
             return false;
         }
     }
@@ -144,10 +161,9 @@ class DataService {
         return await AsyncStorage.getItem(STORAGE_KEY);
     }
 
-    // === ВНУТРІШНЯ ФУНКЦІЯ ===
     async _saveItem(newItem) {
         const currentItems = await this.getAllItems();
-        const updatedItems = [newItem, ...currentItems]; // Додаємо новий елемент на початок
+        const updatedItems = [newItem, ...currentItems];
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedItems));
     }
 }

@@ -7,23 +7,27 @@ import {
   TouchableOpacity, 
   Modal, 
   ScrollView,
-  Platform 
+  Platform,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system/legacy';
+// ЗМІНІТЬ ЦЕЙ РЯДОК: додайте /legacy в кінець імпорту
+import * as FileSystem from 'expo-file-system/legacy'; 
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 
 import DataService from '../data/DataService';
+import { useTheme } from '../context/ThemeContext';
 
 export default function SettingsScreen() {
-  // Стан для модального вікна видалення
+  const { colors, themeMode, updateTheme, isDark } = useTheme();
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
   const handleExport = async () => {
     try {
       const allData = await DataService.getAllItems();
       const jsonData = JSON.stringify(allData, null, 2);
+      // FileSystem тепер імпортований з /legacy, тому ці методи працюватимуть
       const fileUri = FileSystem.documentDirectory + 'mindflow_backup.json';
       await FileSystem.writeAsStringAsync(fileUri, jsonData, { encoding: 'utf8' });
 
@@ -32,6 +36,7 @@ export default function SettingsScreen() {
       }
     } catch (error) {
       console.error(error);
+      Alert.alert("Помилка", "Не вдалося експортувати дані.");
     }
   };
 
@@ -40,63 +45,92 @@ export default function SettingsScreen() {
       const result = await DocumentPicker.getDocumentAsync({ type: 'application/json' });
       if (result.canceled) return;
       
+      // Використання legacy методу для читання
       const fileContent = await FileSystem.readAsStringAsync(result.assets[0].uri);
-      await DataService.importData(fileContent);
-      // Тут можна додати Material 3 Snackbar або просте сповіщення про успіх
+      const success = await DataService.importData(fileContent);
+      if (success) {
+        Alert.alert("Успіх", "Дані успішно імпортовано.");
+      }
     } catch (error) {
       console.error(error);
+      Alert.alert("Помилка", "Некоректний файл даних.");
     }
   };
-
+  
   const confirmDeleteAll = async () => {
     await DataService.clearAllData();
     setDeleteModalVisible(false);
+    Alert.alert("Очищено", "Всі дані видалено.");
   };
 
+  const ThemeOption = ({ id, label, icon }) => (
+    <TouchableOpacity 
+      style={styles.row} 
+      onPress={() => updateTheme(id)}
+    >
+      <View style={[styles.iconBox, { backgroundColor: themeMode === id ? colors.primary + '20' : colors.surfaceVariant }]}>
+        <Ionicons name={icon} size={22} color={themeMode === id ? colors.primary : colors.textSecondary} />
+      </View>
+      <View style={styles.textWrapper}>
+        <Text style={[styles.rowTitle, { color: colors.text }]}>{label}</Text>
+      </View>
+      {themeMode === id && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+    </TouchableOpacity>
+  );
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
       
-      <Text style={styles.sectionHeader}>Дані та резервні копії</Text>
-      <View style={styles.card}>
+      <Text style={[styles.sectionHeader, { color: colors.primary }]}>Зовнішній вигляд</Text>
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <ThemeOption id="light" label="Світла тема" icon="sunny-outline" />
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        <ThemeOption id="dark" label="Темна тема" icon="moon-outline" />
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        <ThemeOption id="system" label="Системна" icon="settings-outline" />
+      </View>
+
+      <Text style={[styles.sectionHeader, { color: colors.primary }]}>Дані та резервні копії</Text>
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
         <TouchableOpacity style={styles.row} onPress={handleExport}>
-          <View style={[styles.iconBox, { backgroundColor: '#EADDFF' }]}>
-            <Ionicons name="cloud-upload-outline" size={22} color="#21005D" />
+          <View style={[styles.iconBox, { backgroundColor: colors.surfaceVariant }]}>
+            <Ionicons name="cloud-upload-outline" size={22} color={colors.textSecondary} />
           </View>
           <View style={styles.textWrapper}>
-            <Text style={styles.rowTitle}>Експорт даних</Text>
-            <Text style={styles.rowSubtitle}>Зберегти все у файл JSON</Text>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Експорт даних</Text>
+            <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>Зберегти все у файл JSON</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#49454F" />
+          <Ionicons name="chevron-forward" size={20} color={colors.border} />
         </TouchableOpacity>
 
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
         <TouchableOpacity style={styles.row} onPress={handleImport}>
-          <View style={[styles.iconBox, { backgroundColor: '#EADDFF' }]}>
-            <Ionicons name="cloud-download-outline" size={22} color="#21005D" />
+          <View style={[styles.iconBox, { backgroundColor: colors.surfaceVariant }]}>
+            <Ionicons name="cloud-download-outline" size={22} color={colors.textSecondary} />
           </View>
           <View style={styles.textWrapper}>
-            <Text style={styles.rowTitle}>Імпорт даних</Text>
-            <Text style={styles.rowSubtitle}>Відновити записи з файлу</Text>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Імпорт даних</Text>
+            <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>Відновити записи з файлу</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#49454F" />
+          <Ionicons name="chevron-forward" size={20} color={colors.border} />
         </TouchableOpacity>
       </View>
 
-      <Text style={[styles.sectionHeader, { color: '#B3261E' }]}>Небезпечна зона</Text>
-      <View style={[styles.card, styles.dangerCard]}>
+      <Text style={[styles.sectionHeader, { color: colors.error }]}>Небезпечна зона</Text>
+      <View style={[styles.card, { backgroundColor: isDark ? '#3D1C1B' : '#FFF1F0' }]}>
         <TouchableOpacity style={styles.row} onPress={() => setDeleteModalVisible(true)}>
-          <View style={[styles.iconBox, { backgroundColor: '#F9DEDC' }]}>
-            <Ionicons name="trash-outline" size={22} color="#B3261E" />
+          <View style={[styles.iconBox, { backgroundColor: isDark ? '#601410' : '#F9DEDC' }]}>
+            <Ionicons name="trash-outline" size={22} color={colors.error} />
           </View>
           <View style={styles.textWrapper}>
-            <Text style={[styles.rowTitle, { color: '#B3261E' }]}>Видалити всі дані</Text>
-            <Text style={styles.rowSubtitle}>Безповоротне очищення застосунку</Text>
+            <Text style={[styles.rowTitle, { color: colors.error }]}>Видалити всі дані</Text>
+            <Text style={[styles.rowSubtitle, { color: isDark ? '#E6E1E5' : '#49454F' }]}>Безповоротне очищення</Text>
           </View>
         </TouchableOpacity>
       </View>
 
-      {/* КАСТОМНЕ MATERIAL 3 МОДАЛЬНЕ ВІКНО ВИДАЛЕННЯ */}
+      {/* МОДАЛЬНЕ ВІКНО ВИДАЛЕННЯ */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -104,12 +138,12 @@ export default function SettingsScreen() {
         onRequestClose={() => setDeleteModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalView}>
+          <View style={[styles.modalView, { backgroundColor: colors.card }]}>
             <View style={styles.modalIconContainer}>
-              <Ionicons name="warning-outline" size={28} color="#B3261E" />
+              <Ionicons name="warning-outline" size={28} color={colors.error} />
             </View>
-            <Text style={styles.modalTitle}>Видалити все?</Text>
-            <Text style={styles.modalText}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Видалити все?</Text>
+            <Text style={[styles.modalText, { color: colors.textSecondary }]}>
               Цю дію неможливо скасувати. Всі ваші думки, ідеї та завдання зникнуть назавжди.
             </Text>
             
@@ -118,13 +152,13 @@ export default function SettingsScreen() {
                 style={styles.modalBtn} 
                 onPress={() => setDeleteModalVisible(false)}
               >
-                <Text style={styles.cancelBtnText}>Скасувати</Text>
+                <Text style={{ color: colors.primary, fontWeight: '500' }}>Скасувати</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.modalBtn, styles.deleteConfirmBtn]} 
+                style={[styles.modalBtn, { backgroundColor: colors.error }]} 
                 onPress={confirmDeleteAll}
               >
-                <Text style={styles.deleteBtnText}>Видалити все</Text>
+                <Text style={{ color: '#FFF', fontWeight: '500' }}>Видалити</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -132,7 +166,7 @@ export default function SettingsScreen() {
       </Modal>
 
       <View style={styles.footer}>
-        <Text style={styles.versionText}>MindFlow v1.3.0</Text>
+        <Text style={[styles.versionText, { color: colors.textSecondary }]}>MindFlow v1.3.0</Text>
       </View>
 
     </ScrollView>
@@ -140,24 +174,22 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FEF7FF' },
+  container: { flex: 1 },
   content: { padding: 16 },
   sectionHeader: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6750A4',
+    fontSize: 12,
+    fontWeight: '700',
     marginLeft: 16,
     marginBottom: 8,
-    marginTop: 16,
-    letterSpacing: 0.5,
+    marginTop: 24,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   card: {
-    backgroundColor: '#F7F2FA', 
     borderRadius: 28, 
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: 8,
   },
-  dangerCard: { backgroundColor: '#FFF1F0' },
   row: { flexDirection: 'row', alignItems: 'center', padding: 16 },
   iconBox: {
     width: 40,
@@ -168,20 +200,18 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   textWrapper: { flex: 1 },
-  rowTitle: { fontSize: 16, color: '#1C1B1F', fontWeight: '500' },
-  rowSubtitle: { fontSize: 14, color: '#49454F', marginTop: 2 },
-  divider: { height: 1, width: '95%', backgroundColor: '#CAC4D0', alignSelf: 'center'},
+  rowTitle: { fontSize: 16, fontWeight: '500' },
+  rowSubtitle: { fontSize: 13, marginTop: 2 },
+  divider: { height: 1, width: '85%', alignSelf: 'flex-end', marginRight: 16 },
   
-  // Стилі модального вікна M3
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalView: {
     width: '85%',
-    backgroundColor: '#F7F2FA',
     borderRadius: 28,
     padding: 24,
     elevation: 6,
@@ -192,14 +222,11 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 24,
-    color: '#1C1B1F',
     marginBottom: 16,
     textAlign: 'center',
-    fontWeight: '400',
   },
   modalText: {
     fontSize: 16,
-    color: '#49454F',
     lineHeight: 24,
     marginBottom: 24,
     textAlign: 'center',
@@ -214,12 +241,6 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     marginLeft: 8,
   },
-  deleteConfirmBtn: {
-    backgroundColor: '#B3261E',
-  },
-  deleteBtnText: { color: '#FFF', fontWeight: '500' },
-  cancelBtnText: { color: '#6750A4', fontWeight: '500' },
-  
   footer: { padding: 32, alignItems: 'center' },
-  versionText: { color: '#938F99', fontSize: 12, fontWeight: '500' },
+  versionText: { fontSize: 12, fontWeight: '500' },
 });
