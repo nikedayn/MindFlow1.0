@@ -8,33 +8,30 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView, 
   Platform,
-  Alert 
+  Alert,
+  Modal,
+  Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons'; // Стандартні іконки Expo
+import { Ionicons } from '@expo/vector-icons';
 import DataService from '../data/DataService';
+import MyLogo from '../../assets/adaptive-icon.png';
 
 export default function HomeScreen({ navigation }) {
   const [thought, setThought] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
 
-  // Обробка натискання кнопки "Відпусти"
   const handleRelease = async () => {
     if (thought.trim().length === 0) {
       return; 
     }
 
     try {
-      // Виклик методу збереження
       await DataService.addRawThought(thought.trim());
-      
-      // Логування для перевірки (можна видалити пізніше)
-      console.log('Думка збережена в БД');
-
       setThought('');
-      Alert.alert("Успіх", "Думку відпущено в потік!"); 
+      setModalVisible(true); // Показуємо Material 3 діалог успіху
     } catch (error) {
       Alert.alert("Помилка", "Не вдалося зберегти думку.");
-      console.error(error);
     }
   };
 
@@ -48,11 +45,15 @@ export default function HomeScreen({ navigation }) {
         {/* === HEADER === */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <Ionicons name="water-outline" size={28} color="#4A90E2" />
+            <Image 
+              source={MyLogo} 
+              style={styles.customLogo} 
+              resizeMode="contain" 
+            />
             <Text style={styles.appName}>MindFlow</Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-            <Ionicons name="settings-outline" size={28} color="#333" />
+            <Ionicons name="settings-outline" size={28} color="#49454F" />
           </TouchableOpacity>
         </View>
 
@@ -61,11 +62,11 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.slogan}>Просто дихай</Text>
           <Text style={styles.subtext}>Ти не повинен все пам'ятати зараз</Text>
 
-          <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
             <TextInput
               style={styles.input}
-              placeholder="Що в тебе на думці?"
-              placeholderTextColor="#999"
+              placeholder="Що у вас на думці?"
+              placeholderTextColor="#938F99"
               multiline
               value={thought}
               onChangeText={setThought}
@@ -73,7 +74,8 @@ export default function HomeScreen({ navigation }) {
           </View>
 
           <TouchableOpacity style={styles.releaseButton} onPress={handleRelease}>
-            <Text style={styles.releaseButtonText}>Відпусти</Text>
+            <Text style={styles.releaseButtonText}>Відпустити</Text>
+            <Ionicons name="send" size={20} color="#FFF" style={{marginLeft: 8}} />
           </TouchableOpacity>
         </View>
 
@@ -83,7 +85,7 @@ export default function HomeScreen({ navigation }) {
             style={styles.navButton} 
             onPress={() => navigation.navigate('RawThoughts')}
           >
-            <Ionicons name="list-outline" size={24} color="#4A90E2" />
+            <Ionicons name="list-outline" size={24} color="#6750A4" />
             <Text style={styles.navButtonText}>Сирі думки</Text>
           </TouchableOpacity>
 
@@ -93,10 +95,36 @@ export default function HomeScreen({ navigation }) {
             style={styles.navButton} 
             onPress={() => navigation.navigate('MyLibrary')}
           >
-            <Ionicons name="library-outline" size={24} color="#4A90E2" />
+            <Ionicons name="library-outline" size={24} color="#6750A4" />
             <Text style={styles.navButtonText}>Моя бібліотека</Text>
           </TouchableOpacity>
         </View>
+
+        {/* === MATERIAL 3 SUCCESS MODAL === */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalView}>
+              <View style={styles.iconCircle}>
+                <Ionicons name="checkmark" size={32} color="#6750A4" />
+              </View>
+              <Text style={styles.modalTitle}>Відпущено</Text>
+              <Text style={styles.modalText}>
+                Вашу думку збережено. Тепер ваш розум вільний для нових ідей.
+              </Text>
+              <TouchableOpacity 
+                style={styles.modalConfirmBtn} 
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.modalConfirmBtnText}>Зрозуміло</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -106,31 +134,34 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA', // Світлий, спокійний фон
+    backgroundColor: '#FEF7FF', // M3 Surface
   },
   contentContainer: {
     flex: 1,
     justifyContent: 'space-between',
   },
-  // Header Styles
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingVertical: 15,
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  appName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginLeft: 10,
-    color: '#333',
+  customLogo: {
+    width: 32,
+    height: 32,
+    marginRight: 10,
   },
-  // Main Content Styles
+  appName: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#1C1B1F',
+    marginLeft: 10,
+  },
   mainContent: {
     flex: 1,
     justifyContent: 'center',
@@ -139,74 +170,115 @@ const styles = StyleSheet.create({
   },
   slogan: {
     fontSize: 32,
-    fontWeight: '300', // Тонкий шрифт для "легкості"
-    color: '#333',
-    marginBottom: 10,
-    textAlign: 'center',
+    fontWeight: '300',
+    color: '#1C1B1F',
+    marginBottom: 8,
   },
   subtext: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 40,
+    color: '#49454F',
+    marginBottom: 32,
     textAlign: 'center',
   },
-  inputContainer: {
+  inputWrapper: {
     width: '100%',
-    marginBottom: 20,
+    backgroundColor: '#ECE6F0', // M3 Surface Variant
+    borderRadius: 28,
+    padding: 16,
+    height: 120, // ФІКСОВАНА ВИСОТА
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#CAC4D0',
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 20,
-    fontSize: 18,
-    minHeight: 120,
-    textAlignVertical: 'top', // Для Android, щоб текст починався зверху
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3, // Тінь для Android
+    fontSize: 16,
+    color: '#1C1B1F',
+    textAlignVertical: 'top',
+    height: '100%',
   },
   releaseButton: {
-    backgroundColor: '#4A90E2',
-    paddingVertical: 15,
-    paddingHorizontal: 40,
-    borderRadius: 30,
-    shadowColor: "#4A90E2",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
+    backgroundColor: '#6750A4',
+    flexDirection: 'row',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 100,
+    alignItems: 'center',
+    elevation: 2,
   },
   releaseButtonText: {
-    color: '#fff',
-    fontSize: 18,
+    color: '#FFF',
+    fontSize: 16,
     fontWeight: '600',
   },
-  // Footer Styles
   footer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    paddingVertical: 15,
+    backgroundColor: '#F7F2FA',
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: '#CAC4D0',
     justifyContent: 'space-around',
     alignItems: 'center',
   },
   navButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+    padding: 8,
   },
   navButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#333',
+    fontSize: 12,
+    color: '#49454F',
+    marginTop: 4,
     fontWeight: '500',
   },
   verticalDivider: {
     width: 1,
     height: '60%',
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#CAC4D0',
+  },
+  // MODAL STYLES
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalView: {
+    width: '80%',
+    backgroundColor: '#F7F2FA',
+    borderRadius: 28,
+    padding: 24,
+    alignItems: 'center',
+    elevation: 5,
+  },
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#EADDFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 24,
+    color: '#1C1B1F',
+    marginBottom: 8,
+  },
+  modalText: {
+    fontSize: 16,
+    color: '#49454F',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  modalConfirmBtn: {
+    backgroundColor: '#6750A4',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 100,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalConfirmBtnText: {
+    color: '#FFF',
+    fontWeight: '600',
   },
 });

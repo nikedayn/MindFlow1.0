@@ -4,12 +4,12 @@ import {
   StyleSheet, 
   Text, 
   View, 
-  FlatList, // Залишаємо FlatList, але тепер він оброблятиме і заголовки
+  FlatList, 
   TouchableOpacity, 
-  Alert, 
   Modal, 
   TextInput, 
-  Platform 
+  Platform,
+  Animated
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -20,303 +20,212 @@ import DataService from '../data/DataService';
 import { ItemType } from '../constants/types';
 
 // === ДОПОМІЖНІ ФУНКЦІЇ ДЛЯ ДАТИ ===
-
 const formatDateHeader = (dateString) => {
   const date = new Date(dateString);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
 
-  // Функція для порівняння лише дати (без часу)
   const isSameDay = (d1, d2) => 
     d1.getFullYear() === d2.getFullYear() &&
     d1.getMonth() === d2.getMonth() &&
     d1.getDate() === d2.getDate();
 
-  const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  const formattedDate = date.toLocaleDateString('uk-UA', options);
+  const options = { month: 'long', day: 'numeric' };
+  if (isSameDay(date, today)) return `Сьогодні, ${date.toLocaleDateString('uk-UA', options)}`;
+  if (isSameDay(date, yesterday)) return `Вчора, ${date.toLocaleDateString('uk-UA', options)}`;
 
-  if (isSameDay(date, today)) return `Сьогодні, ${formattedDate}`;
-  if (isSameDay(date, yesterday)) return `Вчора, ${formattedDate}`;
-
-  return formattedDate;
+  return date.toLocaleDateString('uk-UA', { year: 'numeric', ...options });
 };
 
-// Функція для групування сирих думок за датою
 const groupThoughtsByDate = (thoughts) => {
   const grouped = [];
   let lastDate = null;
-
   for (const thought of thoughts) {
-    // Отримуємо лише дату (YYYY-MM-DD) для заголовка
     const currentDate = new Date(thought.createdAt).toISOString().split('T')[0];
-
     if (currentDate !== lastDate) {
-      // Додаємо елемент-заголовок, коли дата змінюється
       grouped.push({ id: 'header-' + currentDate, isHeader: true, date: currentDate });
       lastDate = currentDate;
     }
-
-    // Додаємо саму думку
     grouped.push(thought);
   }
   return grouped;
 };
 
-// === КОМПОНЕНТ ЗАГОЛОВКА ДАТИ ===
-const DateHeader = ({ dateString }) => (
-  <View style={styles.dateHeaderContainer}>
-    <Text style={styles.dateHeaderText}>{formatDateHeader(dateString)}</Text>
-  </View>
-);
-
-// === КОМПОНЕНТ ОДНОГО ЕЛЕМЕНТА СПИСКУ (SWIPEABLE) ===
+// === КОМПОНЕНТ ЕЛЕМЕНТА (З ПЛАВНИМ СВАЙПОМ) ===
 const ThoughtItem = ({ item, onSwipeLeft, onSwipeRight }) => {
   
-  // Рендер дій при свайпі вправо (Архів/Видалити)
-  const renderRightActions = (progress, dragX) => {
+  const renderRightActions = (progress) => {
+    const trans = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [60, 0],
+    });
     return (
       <View style={styles.rightActionsContainer}>
-        <TouchableOpacity style={[styles.actionButton, styles.archiveBtn]} onPress={() => onSwipeRight('archive', item)}>
-          <Ionicons name="archive-outline" size={24} color="#fff" />
-          <Text style={styles.actionText}>Архів</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.deleteBtn]} onPress={() => onSwipeRight('delete', item)}>
-          <Ionicons name="trash-outline" size={24} color="#fff" />
-          <Text style={styles.actionText}>Видалити</Text>
-        </TouchableOpacity>
+        <Animated.View style={{ transform: [{ translateX: trans }], flex: 1, flexDirection: 'row' }}>
+          <TouchableOpacity style={[styles.actionButton, styles.archiveBtn]} onPress={() => onSwipeRight('archive', item)}>
+            <Ionicons name="archive-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionButton, styles.deleteBtn]} onPress={() => onSwipeRight('delete', item)}>
+            <Ionicons name="trash-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     );
   };
 
-  // Рендер дій при свайпі вліво (Ідея/Справа)
-  const renderLeftActions = (progress, dragX) => {
+  const renderLeftActions = (progress) => {
+    const trans = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-60, 0],
+    });
     return (
       <View style={styles.leftActionsContainer}>
-        <TouchableOpacity style={[styles.actionButton, styles.ideaBtn]} onPress={() => onSwipeLeft('idea', item)}>
-          <Ionicons name="bulb-outline" size={24} color="#fff" />
-          <Text style={styles.actionText}>В Ідею</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.taskBtn]} onPress={() => onSwipeLeft('task', item)}>
-          <Ionicons name="checkbox-outline" size={24} color="#fff" />
-          <Text style={styles.actionText}>В Справу</Text>
-        </TouchableOpacity>
+        <Animated.View style={{ transform: [{ translateX: trans }], flex: 1, flexDirection: 'row' }}>
+          <TouchableOpacity style={[styles.actionButton, styles.ideaBtn]} onPress={() => onSwipeLeft('idea', item)}>
+            <Ionicons name="bulb-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionButton, styles.taskBtn]} onPress={() => onSwipeLeft('task', item)}>
+            <Ionicons name="checkbox-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     );
   };
 
-  // Оновлено: відображаємо дату і час
-  const formattedDateAndTime = `${new Date(item.createdAt).toLocaleDateString('uk-UA')} ${new Date(item.createdAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}`;
-
   return (
-    <Swipeable renderRightActions={renderRightActions} renderLeftActions={renderLeftActions}>
+    <Swipeable 
+      renderRightActions={renderRightActions} 
+      renderLeftActions={renderLeftActions}
+      friction={2}
+      rightThreshold={40}
+    >
       <View style={styles.itemContainer}>
         <Text style={styles.itemText}>{item.text}</Text>
-        <Text style={styles.itemDate}>{formattedDateAndTime}</Text>
+        <Text style={styles.itemDate}>
+          {new Date(item.createdAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
+        </Text>
       </View>
     </Swipeable>
   );
 };
 
-// === ГОЛОВНИЙ ЕКРАН ===
-export default function RawThoughtsScreen({ navigation }) {
-  const [thoughts, setThoughts] = useState([]); // Тепер містить об'єкти думок та об'єкти-заголовки
-  
-  // Стейт для модального вікна конвертації
-  const [modalVisible, setModalVisible] = useState(false);
+export default function RawThoughtsScreen() {
+  const [thoughts, setThoughts] = useState([]);
+  const [convertModalVisible, setConvertModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [targetType, setTargetType] = useState(null); // 'task' або 'idea'
-  
-  // Дані форми в модальному вікні
+  const [targetType, setTargetType] = useState(null);
   const [editText, setEditText] = useState('');
   const [editTag, setEditTag] = useState('');
   const [dueDate, setDueDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Завантаження даних при кожному вході на екран
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [])
-  );
+  useFocusEffect(useCallback(() => { loadData(); }, []));
 
   const loadData = async () => {
-    // DataService.getRawThoughts() вже повертає відсортований список (найновіші зверху)
     const rawData = await DataService.getRawThoughts();
-    const groupedData = groupThoughtsByDate(rawData); // Групуємо дані
-    setThoughts(groupedData);
+    setThoughts(groupThoughtsByDate(rawData));
   };
 
-  // Обробка свайпа вправо (Архів/Видалення)
   const handleSwipeRight = async (action, item) => {
-    // Перевіряємо, чи це випадково не заголовок
     if (item.isHeader) return;
-    
+    setSelectedItem(item);
     if (action === 'archive') {
       await DataService.archiveItem(item.id);
-      loadData(); // Оновлюємо список
+      loadData();
     } else if (action === 'delete') {
-      Alert.alert(
-        "Видалити?",
-        "Цю дію неможливо скасувати.",
-        [
-          { text: "Скасувати", style: "cancel" },
-          { text: "Видалити", style: "destructive", onPress: async () => {
-              await DataService.deleteItem(item.id);
-              loadData();
-            } 
-          }
-        ]
-      );
+      setDeleteModalVisible(true);
     }
   };
 
-  // Обробка свайпа вліво (Відкриття модалки)
   const handleSwipeLeft = (type, item) => {
-    // Перевіряємо, чи це випадково не заголовок
     if (item.isHeader) return; 
-
     setSelectedItem(item);
-    setTargetType(type); // 'task' або 'idea'
-    
-    // Заповнюємо форму поточними даними
+    setTargetType(type);
     setEditText(item.text);
     setEditTag('');
     setDueDate(new Date());
-    
-    setModalVisible(true);
+    setConvertModalVisible(true);
   };
 
-  // Збереження конвертації
+  const confirmDelete = async () => {
+    if (selectedItem) {
+      await DataService.deleteItem(selectedItem.id);
+      setDeleteModalVisible(false);
+      loadData();
+    }
+  };
+
   const handleConvert = async () => {
     if (!editText.trim()) return;
-
-    const updates = {
-      text: editText,
-      tag: editTag.trim() || null, // якщо пустий рядок - null
-    };
-
+    const updates = { text: editText, tag: editTag.trim() || null };
     if (targetType === 'task') {
       updates.dueDate = dueDate.toISOString();
       updates.isCompleted = false;
     }
-
-    const newType = targetType === 'task' ? ItemType.TASK : ItemType.IDEA;
-    
-    await DataService.convertItem(selectedItem.id, newType, updates);
-    
-    setModalVisible(false);
+    await DataService.convertItem(selectedItem.id, targetType === 'task' ? ItemType.TASK : ItemType.IDEA, updates);
+    setConvertModalVisible(false);
     loadData();
-    Alert.alert("Успіх", `Перенесено в ${targetType === 'task' ? 'Справи' : 'Ідеї'}`);
   };
 
-  // Рендер елементів списку, який тепер вміє відображати і заголовки
-  const renderThoughtOrHeader = ({ item }) => {
-    if (item.isHeader) {
-      return <DateHeader dateString={item.date} />;
-    }
-    
-    return (
-      <ThoughtItem 
-        item={item} 
-        onSwipeRight={handleSwipeRight} 
-        onSwipeLeft={handleSwipeLeft} 
-      />
-    );
-  };
-
-  // Рендер списку
   return (
     <View style={styles.container}>
       <FlatList
         data={thoughts}
         keyExtractor={(item) => item.id}
-        renderItem={renderThoughtOrHeader}
-        // ListHeaderComponent={
-        //   <View style={styles.headerContainer}>
-        //     <Text style={styles.headerTitle}>Сирі думки</Text>
-        //     <Text style={styles.headerSubtitle}>Просто ваші сирі думки</Text>
-        //   </View>
-        // }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Поки що тут пусто.</Text>
-            <Text style={styles.emptySubText}>Поверніться на Головну, щоб додати думку.</Text>
-          </View>
-        }
-        contentContainerStyle={{ paddingBottom: 100 }}
+        renderItem={({ item }) => (
+          item.isHeader ? 
+          <View style={styles.headerGap}><Text style={styles.dateHeaderText}>{formatDateHeader(item.date)}</Text></View> : 
+          <ThoughtItem item={item} onSwipeRight={handleSwipeRight} onSwipeLeft={handleSwipeLeft} />
+        )}
+        ListEmptyComponent={<View style={styles.emptyContainer}><Text style={styles.emptyText}>Поки що порожньо</Text></View>}
+        contentContainerStyle={{ paddingBottom: 40 }}
       />
 
-      {/* === МОДАЛЬНЕ ВІКНО КОНВЕРТАЦІЇ === */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
+      {/* МОДАЛКА КОНВЕРТАЦІЇ */}
+      <Modal animationType="fade" transparent={true} visible={convertModalVisible} onRequestClose={() => setConvertModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalView}>
-            <Text style={styles.modalTitle}>
-              {targetType === 'task' ? 'Нова Справа' : 'Нова Ідея'}
-            </Text>
-
-            {/* Редагування тексту */}
-            <Text style={styles.label}>Зміст:</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              multiline
-              value={editText}
-              onChangeText={setEditText}
-            />
-
-            {/* Тег */}
-            <Text style={styles.label}>Тег (опціонально):</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Робота, Дім..."
-              value={editTag}
-              onChangeText={setEditTag}
-            />
-
-            {/* Дата (Тільки для Task) */}
+            <Text style={styles.modalTitle}>{targetType === 'task' ? 'Нова справа' : 'Нова ідея'}</Text>
+            <Text style={styles.label}>Зміст</Text>
+            <TextInput style={[styles.input, styles.textArea]} multiline value={editText} onChangeText={setEditText} />
+            <Text style={styles.label}>Тег (опціонально)</Text>
+            <TextInput style={styles.input} placeholder="Напр: Робота" value={editTag} onChangeText={setEditTag} placeholderTextColor="#938F99" />
             {targetType === 'task' && (
-              <View>
-                <Text style={styles.label}>Дата виконання:</Text>
-                <TouchableOpacity 
-                  style={styles.dateButton} 
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <Text>{dueDate.toLocaleDateString()} {dueDate.toLocaleTimeString().slice(0,5)}</Text>
-                  <Ionicons name="calendar-outline" size={20} color="#333" />
-                </TouchableOpacity>
-                
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={dueDate}
-                    mode="date"
-                    display="default"
-                    onChange={(event, selectedDate) => {
-                      setShowDatePicker(Platform.OS === 'ios'); // На iOS не закриваємо відразу
-                      if (selectedDate) setDueDate(selectedDate);
-                    }}
-                  />
-                )}
-              </View>
-            )}
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.cancelBtn]} 
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.btnText}>Скасувати</Text>
+              <TouchableOpacity style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
+                <Text style={{color: '#1C1B1F'}}>{dueDate.toLocaleDateString()}</Text>
+                <Ionicons name="calendar-outline" size={20} color="#49454F" />
               </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.saveBtn]} 
-                onPress={handleConvert}
-              >
-                <Text style={[styles.btnText, {color: '#fff'}]}>Зберегти</Text>
+            )}
+            {showDatePicker && (
+              <DateTimePicker value={dueDate} mode="date" display="default" onChange={(e, d) => { setShowDatePicker(Platform.OS==='ios'); if(d) setDueDate(d); }} />
+            )}
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalBtn} onPress={() => setConvertModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Скасувати</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalBtn, styles.saveBtn]} onPress={handleConvert}>
+                <Text style={styles.saveBtnText}>Зберегти</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* МОДАЛКА ВИДАЛЕННЯ */}
+      <Modal animationType="fade" transparent={true} visible={deleteModalVisible} onRequestClose={() => setDeleteModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalView}>
+            <Ionicons name="trash-outline" size={28} color="#B3261E" style={{alignSelf: 'center', marginBottom: 16}} />
+            <Text style={styles.modalTitle}>Видалити думку?</Text>
+            <Text style={styles.modalText}>Цю дію неможливо скасувати. Думка зникне назавжди.</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalBtn} onPress={() => setDeleteModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Скасувати</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalBtn, styles.deleteConfirmBtn]} onPress={confirmDelete}>
+                <Text style={styles.saveBtnText}>Видалити</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -327,169 +236,43 @@ export default function RawThoughtsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
-  },
-  // Header
-  headerContainer: {
-    padding: 20,
-    paddingTop: 10,
-    backgroundColor: '#F5F7FA',
-  },
-  headerTitle: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 5,
-    marginBottom: 5, // Додав невеликий відступ, щоб не зливався з першим заголовком дати
-  },
-  // New Date Header Styles
-  dateHeaderContainer: {
-    backgroundColor: '#E0E3E8', // Легкий фон для роздільника
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#d0d3d8',
-  },
-  dateHeaderText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#555',
-  },
-  // List Item
+  container: { flex: 1, backgroundColor: '#FEF7FF' },
+  headerGap: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8 },
+  dateHeaderText: { fontSize: 14, fontWeight: '500', color: '#6750A4' },
   itemContainer: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    justifyContent: 'center',
-  },
-  itemText: {
-    fontSize: 18,
-    color: '#333',
-  },
-  itemDate: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 8,
-  },
-  // Swipe Actions
-  rightActionsContainer: {
-    flexDirection: 'row',
-    width: 160, 
-  },
-  leftActionsContainer: {
-    flexDirection: 'row',
-    width: 160,
-  },
-  actionButton: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  archiveBtn: { backgroundColor: '#FF9500' }, // Orange
-  deleteBtn: { backgroundColor: '#FF3B30' }, // Red
-  ideaBtn: { backgroundColor: '#5856D6' }, // Purple
-  taskBtn: { backgroundColor: '#34C759' }, // Green
-  actionText: {
-    color: '#fff',
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: 'bold',
-  },
-  // Empty State
-  emptyContainer: {
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#333',
-    fontWeight: 'bold',
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 5,
-  },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalView: {
-    width: '90%',
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 5,
-    marginTop: 10,
-  },
-  input: {
+    backgroundColor: '#FFF',
+    marginHorizontal: 16,
+    marginVertical: 4,
+    padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    padding: 10,
-    fontSize: 16,
-    backgroundColor: '#F9F9F9',
+    borderColor: '#ECE6F0',
   },
-  textArea: {
-    minHeight: 60,
-    textAlignVertical: 'top',
+  itemText: { fontSize: 16, color: '#1C1B1F', lineHeight: 24 },
+  itemDate: { fontSize: 11, color: '#49454F', marginTop: 4, textAlign: 'right' },
+  rightActionsContainer: { flexDirection: 'row', width: 140, paddingVertical: 4, paddingRight: 16 },
+  leftActionsContainer: { flexDirection: 'row', width: 140, paddingVertical: 4, paddingLeft: 16 },
+  actionButton: { flex: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 16, marginHorizontal: 4 },
+  archiveBtn: { backgroundColor: '#FFB870' },
+  deleteBtn: { backgroundColor: '#F2B8B5' },
+  ideaBtn: { backgroundColor: '#D0BCFF' },
+  taskBtn: { backgroundColor: '#B4E09E' },
+  emptyContainer: { alignItems: 'center', marginTop: 100 },
+  emptyText: { color: '#49454F', fontSize: 16 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.32)', justifyContent: 'center', alignItems: 'center' },
+  modalView: { 
+    width: '85%', backgroundColor: '#F7F2FA', borderRadius: 28, padding: 24, elevation: 6, shadowColor: 'transparent'
   },
-  dateButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#F9F9F9',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 25,
-  },
-  modalBtn: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  cancelBtn: {
-    backgroundColor: '#ddd',
-  },
-  saveBtn: {
-    backgroundColor: '#4A90E2',
-  },
-  btnText: {
-    fontWeight: '600',
-    fontSize: 16,
-  },
+  modalTitle: { fontSize: 24, fontWeight: '400', color: '#1C1B1F', marginBottom: 16, textAlign: 'center' },
+  modalText: { fontSize: 16, color: '#49454F', lineHeight: 24, marginBottom: 24, textAlign: 'center' },
+  label: { fontSize: 14, fontWeight: '500', color: '#49454F', marginBottom: 4, marginTop: 12 },
+  input: { backgroundColor: '#ECE6F0', borderRadius: 4, borderBottomWidth: 1, borderBottomColor: '#49454F', padding: 12, fontSize: 16, color: '#1C1B1F' },
+  textArea: { minHeight: 80, textAlignVertical: 'top' },
+  dateButton: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, backgroundColor: '#ECE6F0', borderRadius: 8, marginTop: 12 },
+  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 24 },
+  modalBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 100, marginLeft: 8 },
+  saveBtn: { backgroundColor: '#6750A4' },
+  deleteConfirmBtn: { backgroundColor: '#B3261E' },
+  saveBtnText: { color: '#FFF', fontWeight: '500' },
+  cancelBtnText: { color: '#6750A4', fontWeight: '500' },
 });

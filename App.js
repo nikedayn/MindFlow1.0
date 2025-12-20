@@ -11,14 +11,6 @@ import RawThoughtsScreen from './src/screens/RawThoughtsScreen';
 import MyLibraryScreen from './src/screens/MyLibraryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
-// Заглушка для бібліотеки (поки що)
-const PlaceholderScreen = ({ route }) => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text>Екран: {route.name}</Text>
-    <Text style={{ color: 'gray', marginTop: 10 }}>Ще в розробці</Text>
-  </View>
-);
-
 const Stack = createNativeStackNavigator();
 
 export default function App() {

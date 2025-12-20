@@ -1,12 +1,13 @@
 // src/screens/SettingsScreen.js
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   StyleSheet, 
   Text, 
   View, 
   TouchableOpacity, 
-  Alert, 
-  ScrollView 
+  Modal, 
+  ScrollView,
+  Platform 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -16,134 +17,122 @@ import * as DocumentPicker from 'expo-document-picker';
 import DataService from '../data/DataService';
 
 export default function SettingsScreen() {
+  // Стан для модального вікна видалення
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
-  // === 1. ЕКСПОРТ ДАНИХ ===
   const handleExport = async () => {
     try {
-      // 1. Отримуємо всі дані з БД
       const allData = await DataService.getAllItems();
       const jsonData = JSON.stringify(allData, null, 2);
-
-      // 2. Створюємо тимчасовий файл
       const fileUri = FileSystem.documentDirectory + 'mindflow_backup.json';
       await FileSystem.writeAsStringAsync(fileUri, jsonData, { encoding: 'utf8' });
 
-      // 3. Відкриваємо діалог "Поділитися/Зберегти"
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri);
-      } else {
-        Alert.alert("Помилка", "Функція 'Поділитися' недоступна на цьому пристрої");
       }
     } catch (error) {
       console.error(error);
-      Alert.alert("Помилка", "Не вдалося створити файл резервної копії");
     }
   };
 
-  // === 2. ІМПОРТ ДАНИХ ===
   const handleImport = async () => {
     try {
-      // 1. Відкриваємо пікер файлів
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/json', // Тільки JSON
-        copyToCacheDirectory: true,
-      });
-
+      const result = await DocumentPicker.getDocumentAsync({ type: 'application/json' });
       if (result.canceled) return;
-
-      const fileUri = result.assets[0].uri;
-
-      // 2. Читаємо файл
-      const fileContent = await FileSystem.readAsStringAsync(fileUri);
       
-      // 3. Валідація JSON (спрощена)
-      const parsedData = JSON.parse(fileContent);
-      if (!Array.isArray(parsedData)) {
-        throw new Error("Невірний формат файлу (має бути масив)");
-      }
-
-      // 4. Завантажуємо в БД
-      // Питаємо підтвердження, бо це перезапише дані
-      Alert.alert(
-        "Підтвердження імпорту",
-        "Це замінить усі ваші поточні записи даними з файлу. Ви впевнені?",
-        [
-          { text: "Скасувати", style: "cancel" },
-          { 
-            text: "Імпортувати", 
-            onPress: async () => {
-              await DataService.importData(fileContent); // Зберігаємо як string
-              Alert.alert("Успіх", "Дані успішно відновлено!");
-            } 
-          }
-        ]
-      );
-
+      const fileContent = await FileSystem.readAsStringAsync(result.assets[0].uri);
+      await DataService.importData(fileContent);
+      // Тут можна додати Material 3 Snackbar або просте сповіщення про успіх
     } catch (error) {
       console.error(error);
-      Alert.alert("Помилка", "Не вдалося прочитати файл. Переконайтеся, що це коректний JSON backup.");
     }
   };
 
-  // === 3. ПОВНЕ ВИДАЛЕННЯ ===
-  const handleDeleteAll = () => {
-    Alert.alert(
-      "Видалити ВСІ дані?",
-      "Ви впевнені, що хочете видалити всі локальні дані? Цю дію неможливо скасувати.",
-      [
-        { text: "Скасувати", style: "cancel" },
-        { 
-          text: "Видалити все", 
-          style: "destructive", // Червоний колір на iOS
-          onPress: async () => {
-            await DataService.clearAllData();
-            Alert.alert("Виконано", "Застосунок очищено. Можна починати з чистого аркуша.");
-          }
-        }
-      ]
-    );
+  const confirmDeleteAll = async () => {
+    await DataService.clearAllData();
+    setDeleteModalVisible(false);
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       
-      {/* Секція: Дані */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Збереження і відновлення даних</Text>
-        
-        <TouchableOpacity style={styles.button} onPress={handleExport}>
-          <Ionicons name="cloud-upload-outline" size={24} color="#333" />
-          <View style={styles.textWrapper}>
-            <Text style={styles.buttonTitle}>Експорт даних</Text>
-            <Text style={styles.buttonSubtitle}>Зберегти резервну копію у файл JSON</Text>
+      <Text style={styles.sectionHeader}>Дані та резервні копії</Text>
+      <View style={styles.card}>
+        <TouchableOpacity style={styles.row} onPress={handleExport}>
+          <View style={[styles.iconBox, { backgroundColor: '#EADDFF' }]}>
+            <Ionicons name="cloud-upload-outline" size={22} color="#21005D" />
           </View>
+          <View style={styles.textWrapper}>
+            <Text style={styles.rowTitle}>Експорт даних</Text>
+            <Text style={styles.rowSubtitle}>Зберегти все у файл JSON</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#49454F" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.button} onPress={handleImport}>
-          <Ionicons name="cloud-download-outline" size={24} color="#333" />
+        <View style={styles.divider} />
+
+        <TouchableOpacity style={styles.row} onPress={handleImport}>
+          <View style={[styles.iconBox, { backgroundColor: '#EADDFF' }]}>
+            <Ionicons name="cloud-download-outline" size={22} color="#21005D" />
+          </View>
           <View style={styles.textWrapper}>
-            <Text style={styles.buttonTitle}>Імпорт даних</Text>
-            <Text style={styles.buttonSubtitle}>Відновити дані з файлу JSON</Text>
+            <Text style={styles.rowTitle}>Імпорт даних</Text>
+            <Text style={styles.rowSubtitle}>Відновити записи з файлу</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#49454F" />
+        </TouchableOpacity>
+      </View>
+
+      <Text style={[styles.sectionHeader, { color: '#B3261E' }]}>Небезпечна зона</Text>
+      <View style={[styles.card, styles.dangerCard]}>
+        <TouchableOpacity style={styles.row} onPress={() => setDeleteModalVisible(true)}>
+          <View style={[styles.iconBox, { backgroundColor: '#F9DEDC' }]}>
+            <Ionicons name="trash-outline" size={22} color="#B3261E" />
+          </View>
+          <View style={styles.textWrapper}>
+            <Text style={[styles.rowTitle, { color: '#B3261E' }]}>Видалити всі дані</Text>
+            <Text style={styles.rowSubtitle}>Безповоротне очищення застосунку</Text>
           </View>
         </TouchableOpacity>
       </View>
 
-      {/* Секція: Небезпечна зона */}
-      <View style={[styles.section, styles.dangerZone]}>
-        <Text style={[styles.sectionTitle, { color: '#FF3B30' }]}>Небезпечна зона</Text>
-        
-        <TouchableOpacity style={styles.dangerButton} onPress={handleDeleteAll}>
-          <Ionicons name="trash-bin-outline" size={24} color="#fff" />
-          <Text style={styles.dangerButtonText}>Видалити всі локальні дані</Text>
-        </TouchableOpacity>
-        
-        <Text style={styles.warningText}>
-          Увага: Ця дія безповоротно видалить усі ваші думки, справи та ідеї з цього пристрою.
-        </Text>
-      </View>
+      {/* КУСТОМНЕ MATERIAL 3 МОДАЛЬНЕ ВІКНО ВИДАЛЕННЯ */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={deleteModalVisible}
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalView}>
+            <View style={styles.modalIconContainer}>
+              <Ionicons name="warning-outline" size={28} color="#B3261E" />
+            </View>
+            <Text style={styles.modalTitle}>Видалити все?</Text>
+            <Text style={styles.modalText}>
+              Цю дію неможливо скасувати. Всі ваші думки, ідеї та завдання зникнуть назавжди.
+            </Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.modalBtn} 
+                onPress={() => setDeleteModalVisible(false)}
+              >
+                <Text style={styles.cancelBtnText}>Скасувати</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.deleteConfirmBtn]} 
+                onPress={confirmDeleteAll}
+              >
+                <Text style={styles.deleteBtnText}>Видалити все</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.footer}>
-        <Text style={styles.versionText}>MindFlow v1.0.0</Text>
+        <Text style={styles.versionText}>MindFlow v1.3.0</Text>
       </View>
 
     </ScrollView>
@@ -151,83 +140,86 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
-  },
-  section: {
-    backgroundColor: '#fff',
-    marginVertical: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  sectionTitle: {
+  container: { flex: 1, backgroundColor: '#FEF7FF' },
+  content: { padding: 16 },
+  sectionHeader: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#666',
-    marginBottom: 15,
-    textTransform: 'uppercase',
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  textWrapper: {
-    marginLeft: 15,
-    flex: 1,
-  },
-  buttonTitle: {
-    fontSize: 16,
-    color: '#333',
     fontWeight: '500',
+    color: '#6750A4',
+    marginLeft: 16,
+    marginBottom: 8,
+    marginTop: 16,
+    letterSpacing: 0.5,
   },
-  buttonSubtitle: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 2,
+  card: {
+    backgroundColor: '#F7F2FA', 
+    borderRadius: 28, 
+    overflow: 'hidden',
+    marginBottom: 16,
   },
-  
-  // Danger Zone
-  dangerZone: {
-    marginTop: 30,
-    borderColor: '#ffcccb', // light red border
-  },
-  dangerButton: {
-    backgroundColor: '#FF3B30',
-    flexDirection: 'row',
-    alignItems: 'center',
+  dangerCard: { backgroundColor: '#FFF1F0' },
+  row: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 5,
+    alignItems: 'center',
+    marginRight: 16,
   },
-  dangerButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginLeft: 10,
-  },
-  warningText: {
-    marginTop: 15,
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-
-  // Footer
-  footer: {
-    padding: 20,
+  textWrapper: { flex: 1 },
+  rowTitle: { fontSize: 16, color: '#1C1B1F', fontWeight: '500' },
+  rowSubtitle: { fontSize: 14, color: '#49454F', marginTop: 2 },
+  divider: { height: 1, backgroundColor: '#CAC4D0', marginLeft: 72 },
+  
+  // Стилі модального вікна M3
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  versionText: {
-    color: '#ccc',
-    fontSize: 12,
+  modalView: {
+    width: '85%',
+    backgroundColor: '#F7F2FA',
+    borderRadius: 28,
+    padding: 24,
+    elevation: 6,
   },
+  modalIconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 24,
+    color: '#1C1B1F',
+    marginBottom: 16,
+    textAlign: 'center',
+    fontWeight: '400',
+  },
+  modalText: {
+    fontSize: 16,
+    color: '#49454F',
+    lineHeight: 24,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  modalBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 100,
+    marginLeft: 8,
+  },
+  deleteConfirmBtn: {
+    backgroundColor: '#B3261E',
+  },
+  deleteBtnText: { color: '#FFF', fontWeight: '500' },
+  cancelBtnText: { color: '#6750A4', fontWeight: '500' },
+  
+  footer: { padding: 32, alignItems: 'center' },
+  versionText: { color: '#938F99', fontSize: 12, fontWeight: '500' },
 });
