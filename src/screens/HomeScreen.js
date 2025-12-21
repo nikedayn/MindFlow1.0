@@ -17,40 +17,45 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import DataService from '../data/DataService';
+
 import { ItemType } from '../constants/types';
 import { useTheme } from '../context/ThemeContext';
-
+import DataService from '../data/DataService';
 import AdaptiveIcon from '../../assets/adaptive-icon.png';
 
 export default function HomeScreen({ navigation }) {
-  const [thought, setThought] = useState('');
-  const [successModalVisible, setSuccessModalVisible] = useState(false);
-  const [actionMenuVisible, setActionMenuVisible] = useState(false);
-  const { colors } = useTheme();
+  // СТЕЙТИ
+  const [thought, setThought] = useState(''); // Поле вводу думки
+  const [successModalVisible, setSuccessModalVisible] = useState(false); // Відображення модального вікна успіху
+  const [actionMenuVisible, setActionMenuVisible] = useState(false); // Відображення меню дій для довгого натискання
+  const { colors } = useTheme(); // Тема додатку
 
+  // Завершальна дія після збереження думки
   const finishAction = () => {
-    setThought('');
-    Keyboard.dismiss();
-    setSuccessModalVisible(true);
+    setThought(''); // Очищення поля вводу
+    Keyboard.dismiss(); // Ховаємо клавіатуру
+    setSuccessModalVisible(true); // Показуємо модальне вікно успіху
   };
 
+  // Обробник для кнопки "Відпустити"
   const handleReleaseRaw = async () => {
-    if (thought.trim().length === 0) return;
+    if (thought.trim().length === 0) return; // Ігноруємо порожні думки
     try {
-      await DataService.addRawThought(thought.trim());
+      await DataService.addRawThought(thought.trim()); // Збереження сирої думки
       finishAction();
     } catch (error) {
       Alert.alert("Помилка", "Не вдалося зберегти.");
     }
   };
 
+  // Обробник для довгого натискання на кнопку "Відпустити"
   const handleLongPress = () => {
     if (thought.trim().length === 0) return;
     Keyboard.dismiss();
     setActionMenuVisible(true);
   };
 
+  // Збереження думки як типізованого елемента
   const saveAsTyped = async (type) => {
     try {
       setActionMenuVisible(false);
@@ -61,6 +66,7 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  // ГОЛОВНИЙ РЕНДЕР
   return (
     // Зовнішній View з colors.background ПРИБИРАЄ спалахи та затемнення
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -200,36 +206,199 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
+// СТИЛІ
+import { StyleSheet } from 'react-native';
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  contentContainer: { flex: 1, justifyContent: 'space-between' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 15 },
-  logoContainer: { flexDirection: 'row', alignItems: 'center' },
-  logoImage: { width: 32, height: 32 },
-  appName: { fontSize: 22, fontWeight: '600', marginLeft: 10 },
-  mainContent: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 30 },
-  slogan: { fontSize: 32, fontWeight: '300', marginBottom: 8, textAlign: 'center' },
-  subtext: { fontSize: 16, marginBottom: 32, textAlign: 'center' },
-  inputWrapper: { width: '100%', borderRadius: 28, padding: 16, height: 140, marginBottom: 24, borderWidth: 1 },
-  input: { fontSize: 16, textAlignVertical: 'top', height: '100%' },
-  releaseButton: { paddingVertical: 16, paddingHorizontal: 48, borderRadius: 100, elevation: 2 },
-  releaseButtonText: { color: '#FFF', fontSize: 18, fontWeight: '600' },
-  hintText: { fontSize: 12, marginTop: 8 },
-  footer: { flexDirection: 'row', paddingVertical: 12, borderTopWidth: 1, justifyContent: 'space-around', alignItems: 'center' },
-  navButton: { alignItems: 'center', padding: 8 },
-  navButtonText: { fontSize: 11, marginTop: 4, fontWeight: '500' },
-  verticalDivider: { width: 1, height: '60%' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalView: { width: '85%', borderRadius: 28, padding: 24, alignItems: 'center', elevation: 5 },
-  bottomSheet: { width: '100%', position: 'absolute', bottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 40 },
-  dragHandle: { width: 40, height: 4, borderRadius: 2, marginBottom: 20 },
-  menuHeader: { fontSize: 14, fontWeight: '600', marginBottom: 15, textTransform: 'uppercase', letterSpacing: 1 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', width: '100%', paddingVertical: 15 },
-  menuText: { fontSize: 16, marginLeft: 15, fontWeight: '500' },
-  iconCircle: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 24, marginBottom: 8, fontWeight: '500' },
-  modalText: { fontSize: 16, textAlign: 'center', marginBottom: 24 },
-  modalConfirmBtn: { paddingVertical: 12, borderRadius: 100, width: '100%', alignItems: 'center' },
-  modalConfirmBtnText: { color: '#FFF', fontWeight: '600' },
+  // ==========================================
+  // ОСНОВНІ КОНТЕЙНЕРИ (Layout)
+  // ==========================================
+  container: {
+    flex: 1,
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  mainContent: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+  },
+
+  // ==========================================
+  // ВЕРХНЯ ПАНЕЛЬ (Header)
+  // ==========================================
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 15,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoImage: {
+    width: 32,
+    height: 32,
+  },
+  appName: {
+    fontSize: 22,
+    fontWeight: '600',
+    marginLeft: 10,
+  },
+
+  // ==========================================
+  // ГОЛОВНИЙ ТЕКСТ ТА ФОРМА (Main UI)
+  // ==========================================
+  slogan: {
+    fontSize: 32,
+    fontWeight: '300',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtext: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  inputWrapper: {
+    width: '100%',
+    height: 140,
+    padding: 16,
+    borderRadius: 28,
+    borderWidth: 1,
+    marginBottom: 24,
+  },
+  input: {
+    height: '100%',
+    fontSize: 16,
+    textAlignVertical: 'top',
+  },
+  releaseButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    borderRadius: 100,
+    elevation: 2,
+  },
+  releaseButtonText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  hintText: {
+    fontSize: 12,
+    marginTop: 8,
+  },
+
+  // ==========================================
+  // НИЖНЯ НАВІГАЦІЯ (Footer / Tab Bar)
+  // ==========================================
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+  },
+  navButton: {
+    alignItems: 'center',
+    padding: 8,
+  },
+  navButtonText: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  verticalDivider: {
+    width: 1,
+    height: '60%',
+  },
+
+  // ==========================================
+  // МОДАЛЬНІ ВІКНА ТА МЕНЮ (Overlays)
+  // ==========================================
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalView: {
+    width: '85%',
+    padding: 24,
+    borderRadius: 28,
+    alignItems: 'center',
+    elevation: 5,
+  },
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    paddingBottom: 40,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 20,
+  },
+
+  // --- Елементи всередині модалок ---
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  modalText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  modalConfirmBtn: {
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 100,
+    alignItems: 'center',
+  },
+  modalConfirmBtnText: {
+    color: '#FFF',
+    fontWeight: '600',
+  },
+
+  // --- Елементи меню ---
+  menuHeader: {
+    fontSize: 14,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 15,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 15,
+  },
+  menuText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 15,
+  },
 });

@@ -23,6 +23,7 @@ export default function SettingsScreen() {
   const { colors, themeMode, updateTheme, isDark } = useTheme();
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
+  // ЕКСПОРТ ТА ІМПОРТ ДАНИХ
   const handleExport = async () => {
     try {
       const allData = await DataService.getAllItems();
@@ -56,13 +57,15 @@ export default function SettingsScreen() {
       Alert.alert("Помилка", "Некоректний файл даних.");
     }
   };
-  
+
+  // ПІДТВЕРДЖЕННЯ ВИДАЛЕННЯ ВСІХ ДАНИХ
   const confirmDeleteAll = async () => {
     await DataService.clearAllData();
     setDeleteModalVisible(false);
     Alert.alert("Очищено", "Всі дані видалено.");
   };
 
+  // Компонент для варіантів теми
   const ThemeOption = ({ id, label, icon }) => (
     <TouchableOpacity 
       style={styles.row} 
@@ -166,7 +169,7 @@ export default function SettingsScreen() {
       </Modal>
 
       <View style={styles.footer}>
-        <Text style={[styles.versionText, { color: colors.textSecondary }]}>MindFlow v1.3.0</Text>
+        <Text style={[styles.versionText, { color: colors.textSecondary }]}>MindFlow v1.3.3</Text>
       </View>
 
     </ScrollView>
@@ -174,23 +177,38 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 16 },
+  // ==========================================
+  // ГОЛОВНА СТРУКТУРА (Layout)
+  // ==========================================
+  container: {
+    flex: 1,
+  },
+  content: {
+    padding: 16,
+  },
   sectionHeader: {
+    marginTop: 24,
+    marginBottom: 8,
+    marginLeft: 16,
     fontSize: 12,
     fontWeight: '700',
-    marginLeft: 16,
-    marginBottom: 8,
-    marginTop: 24,
-    letterSpacing: 1,
     textTransform: 'uppercase',
+    letterSpacing: 1,
   },
+
+  // ==========================================
+  // КАРТКИ ТА РЯДКИ (List / Rows)
+  // ==========================================
   card: {
-    borderRadius: 28, 
-    overflow: 'hidden',
     marginBottom: 8,
+    borderRadius: 28,
+    overflow: 'hidden', // Щоб контент не виходив за межі радіуса
   },
-  row: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
   iconBox: {
     width: 40,
     height: 40,
@@ -199,22 +217,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 16,
   },
-  textWrapper: { flex: 1 },
-  rowTitle: { fontSize: 16, fontWeight: '500' },
-  rowSubtitle: { fontSize: 13, marginTop: 2 },
-  divider: { height: 1, width: '85%', alignSelf: 'flex-end', marginRight: 16 },
-  
+  textWrapper: {
+    flex: 1,
+  },
+  rowTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  rowSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  divider: {
+    height: 1,
+    width: '85%',
+    alignSelf: 'flex-end',
+    marginRight: 16,
+  },
+
+  // ==========================================
+  // МОДАЛЬНІ ВІКНА (Modals)
+  // ==========================================
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalView: {
     width: '85%',
-    borderRadius: 28,
     padding: 24,
-    elevation: 6,
+    borderRadius: 28,
+    elevation: 6, // Тінь для Android
   },
   modalIconContainer: {
     alignItems: 'center',
@@ -222,25 +256,35 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 24,
-    marginBottom: 16,
     textAlign: 'center',
+    marginBottom: 16,
   },
   modalText: {
     fontSize: 16,
     lineHeight: 24,
-    marginBottom: 24,
     textAlign: 'center',
+    marginBottom: 24,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
   modalBtn: {
-    paddingHorizontal: 16,
     paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 100,
     marginLeft: 8,
   },
-  footer: { padding: 32, alignItems: 'center' },
-  versionText: { fontSize: 12, fontWeight: '500' },
+
+  // ==========================================
+  // НИЖНЯ ЧАСТИНА (Footer)
+  // ==========================================
+  footer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  versionText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
 });

@@ -266,28 +266,154 @@ export default function MyLibraryScreen() {
   );
 }
 
+import { StyleSheet } from 'react-native';
+
 const styles = StyleSheet.create({
-  sceneContainer: { flex: 1 },
-  itemContainer: { padding: 16, marginHorizontal: 16, marginVertical: 4, borderRadius: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1 },
-  checkboxContainer: { marginRight: 12 },
-  textContainer: { flex: 1 },
-  itemText: { fontSize: 16, lineHeight: 22 },
-  completedText: { textDecorationLine: 'line-through', opacity: 0.5 },
-  metaContainer: { flexDirection: 'row', marginTop: 8, alignItems: 'center', flexWrap: 'wrap' },
-  tagBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginRight: 12 },
-  tagText: { fontSize: 12, fontWeight: '600' },
-  dateText: { fontSize: 12 },
-  dateToggle: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderRadius: 12 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalView: { width: '85%', borderRadius: 28, padding: 24, elevation: 6 },
-  bottomSheet: { width: '100%', position: 'absolute', bottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 40 },
-  dragHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16, textAlign: 'center' },
-  input: { borderRadius: 12, padding: 12, minHeight: 80, textAlignVertical: 'top', fontSize: 16 },
-  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 24 },
-  modalBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 100, marginLeft: 8 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 8 },
-  menuText: { fontSize: 16, marginLeft: 16, fontWeight: '500' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyTitle: { fontSize: 18, marginTop: 16, fontWeight: '600' }
+  // ==========================================
+  // LAYOUT & SCREENS
+  // ==========================================
+  sceneContainer: {
+    flex: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+
+  // ==========================================
+  // LIST ITEMS (TASKS/CARDS)
+  // ==========================================
+  itemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  checkboxContainer: {
+    marginRight: 12,
+  },
+  textContainer: {
+    flex: 1,
+  },
+  itemText: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  completedText: {
+    textDecorationLine: 'line-through',
+    opacity: 0.5,
+  },
+
+  // --- Meta Info (Tags & Dates) ---
+  metaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  tagBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  dateText: {
+    fontSize: 12,
+  },
+  dateToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+  },
+
+  // ==========================================
+  // MODALS & OVERLAYS
+  // ==========================================
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalView: {
+    width: '85%',
+    padding: 24,
+    borderRadius: 28,
+    elevation: 6, // Тінь для Android
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+
+  // --- Bottom Sheet Specific ---
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    paddingBottom: 40,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+
+  // ==========================================
+  // INPUTS & BUTTONS
+  // ==========================================
+  input: {
+    minHeight: 80,
+    padding: 12,
+    borderRadius: 12,
+    fontSize: 16,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 24,
+  },
+  modalBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 100,
+    marginLeft: 8,
+  },
+
+  // ==========================================
+  // MENU ITEMS
+  // ==========================================
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+  },
+  menuText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 16,
+  },
 });

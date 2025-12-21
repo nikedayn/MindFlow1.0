@@ -1,5 +1,4 @@
 // src/constants/types.js
-
 export const ItemType = {
   RAW: 'raw',   // Сира думка
   TASK: 'task', // Справа

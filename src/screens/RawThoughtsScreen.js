@@ -64,6 +64,7 @@ export default function RawThoughtsScreen() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [editText, setEditText] = useState('');
 
+  // Завантаження даних при фокусі екрану
   const loadData = async () => {
     const rawData = await DataService.getRawThoughts();
     // Сортуємо за часом (нові зверху) перед групуванням
@@ -73,6 +74,7 @@ export default function RawThoughtsScreen() {
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
+  // Збереження редагованого тексту
   const handleSaveEdit = async () => {
     if (!editText.trim()) return;
     await DataService.updateItem(selectedItem.id, { text: editText.trim() });
@@ -80,6 +82,7 @@ export default function RawThoughtsScreen() {
     loadData();
   };
 
+  // Обробка швидких дій із меню
   const handleQuickAction = async (action) => {
     setActionsModalVisible(false);
     if (action === 'archive') await DataService.archiveItem(selectedItem.id);
@@ -89,6 +92,7 @@ export default function RawThoughtsScreen() {
     loadData();
   };
 
+  // Рендеринг кожного елемента списку
   const renderItem = ({ item }) => {
     if (item.isHeader) {
       return (
@@ -171,7 +175,7 @@ export default function RawThoughtsScreen() {
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
               <View style={[styles.modalView, styles.bottomSheet, { backgroundColor: colors.card }]}>
-                <View style={styles.dragHandle, { backgroundColor: colors.border }} />
+                <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
                 <TouchableOpacity style={styles.menuItem} onPress={() => handleQuickAction('to_idea')}>
                   <Ionicons name="bulb-outline" size={22} color={colors.text} />
                   <Text style={[styles.menuText, { color: colors.text }]}>Зробити ідеєю</Text>
@@ -221,23 +225,121 @@ export default function RawThoughtsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  headerContainer: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 },
-  headerText: { fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  itemContainer: { padding: 16, marginHorizontal: 16, marginVertical: 4, borderRadius: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center' },
-  textContainer: { flex: 1 },
-  itemText: { fontSize: 16, lineHeight: 22 },
-  itemTime: { fontSize: 12, marginTop: 6 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalView: { width: '85%', borderRadius: 28, padding: 24 },
-  bottomSheet: { width: '100%', position: 'absolute', bottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 40 },
-  dragHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16, textAlign: 'center' },
-  input: { borderRadius: 12, padding: 12, minHeight: 100, textAlignVertical: 'top', fontSize: 16 },
-  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 24 },
-  modalBtn: { paddingHorizontal: 20, paddingVertical: 10, marginLeft: 8 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 8 },
-  menuText: { fontSize: 16, marginLeft: 16, fontWeight: '500' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyTitle: { fontSize: 18, marginTop: 16, fontWeight: '600' }
+  // --- Загальні контейнери ---
+  container: {
+    flex: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+
+  // --- Заголовок списку (Header) ---
+  headerContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 8,
+  },
+  headerText: {
+    fontSize: 14,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+
+  // --- Елемент списку (Item Card) ---
+  itemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  textContainer: {
+    flex: 1,
+  },
+  itemText: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  itemTime: {
+    fontSize: 12,
+    marginTop: 6,
+  },
+
+  // --- Модальні вікна та Overlay ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalView: {
+    width: '85%',
+    borderRadius: 28,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+
+  // --- Форми та Кнопки ---
+  input: {
+    minHeight: 100,
+    padding: 12,
+    borderRadius: 12,
+    fontSize: 16,
+    textAlignVertical: 'top', // Важливо для Android
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 24,
+  },
+  modalBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginLeft: 8,
+  },
+
+  // --- Bottom Sheet (Нижня панель) ---
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    paddingBottom: 40,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+
+  // --- Меню ---
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+  },
+  menuText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 16,
+  },
 });

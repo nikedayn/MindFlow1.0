@@ -21,7 +21,6 @@ class DataService {
     }
 
     // === НАЛАШТУВАННЯ ТЕМИ ===
-
     async setTheme(theme) {
         try {
             await AsyncStorage.setItem(THEME_KEY, theme);
@@ -39,7 +38,6 @@ class DataService {
     }
 
     // === ОТРИМАННЯ ДАНИХ ===
-
     async getRawThoughts() {
         const allItems = await this.getAllItems();
         return allItems.filter(item => item.type === ItemType.RAW && item.status === ItemStatus.ACTIVE);
@@ -64,7 +62,6 @@ class DataService {
     }
 
     // === СТВОРЕННЯ ДАНИХ ===
-
     // Додати нову "Миттєву думку"
     async addRawThought(text) {
         const newItem = {
@@ -115,7 +112,6 @@ class DataService {
     }
 
     // === ОНОВЛЕННЯ ТА ВИДАЛЕННЯ ===
-
     async updateItem(id, updates) {
         const allItems = await this.getAllItems();
         const updatedItems = allItems.map(item => {
@@ -138,7 +134,6 @@ class DataService {
     }
 
     // === СЛУЖБОВІ ФУНКЦІЇ ===
-
     async clearAllData() {
         await AsyncStorage.removeItem(STORAGE_KEY);
     }
