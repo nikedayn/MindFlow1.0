@@ -7,10 +7,13 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+
+// Імпортуємо екрани
 import HomeScreen from './src/screens/HomeScreen';
 import RawThoughtsScreen from './src/screens/RawThoughtsScreen';
 import MyLibraryScreen from './src/screens/MyLibraryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import ArchiveScreen from './src/screens/ArchiveScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -57,6 +60,7 @@ function AppNavigation() {
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Налаштування' }} />
         <Stack.Screen name="RawThoughts" component={RawThoughtsScreen} options={{ title: 'Миттєві думки' }} />
         <Stack.Screen name="MyLibrary" component={MyLibraryScreen} options={{ title: 'Моя бібліотека' }} />
+        <Stack.Screen name="Archive" component={ArchiveScreen} options={{ title: 'Архів' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

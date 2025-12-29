@@ -135,7 +135,7 @@ const LibraryTab = ({ routeKey, data, refreshAll }) => {
       />
 
       {/* Редагування */}
-      <Modal visible={editModalVisible} transparent animationType="fade">
+      <Modal visible={editModalVisible} transparent animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
         <TouchableWithoutFeedback onPress={() => setEditModalVisible(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
@@ -167,7 +167,7 @@ const LibraryTab = ({ routeKey, data, refreshAll }) => {
       </Modal>
 
       {/* Швидкі дії */}
-      <Modal visible={actionsModalVisible} transparent animationType="slide">
+      <Modal visible={actionsModalVisible} transparent animationType="slide" onRequestClose={() => setActionsModalVisible(false)}>
         <TouchableWithoutFeedback onPress={() => setActionsModalVisible(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
@@ -194,7 +194,7 @@ const LibraryTab = ({ routeKey, data, refreshAll }) => {
       </Modal>
 
       {/* Підтвердження видалення */}
-      <Modal visible={deleteModalVisible} transparent animationType="fade">
+      <Modal visible={deleteModalVisible} transparent animationType="fade" onRequestClose={() => setActionsModalVisible(false)}>
         <TouchableWithoutFeedback onPress={() => setDeleteModalVisible(false)}>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalView, { backgroundColor: colors.card }]}>
@@ -221,8 +221,7 @@ export default function MyLibraryScreen() {
   const [index, setIndex] = useState(0);
   const [routes] = useState([
     { key: 'tasks', title: 'Справи' }, 
-    { key: 'ideas', title: 'Ідеї' }, 
-    { key: 'archive', title: 'Архів' }
+    { key: 'ideas', title: 'Ідеї' },
   ]);
 
   // Спільний стан для всіх вкладок
@@ -265,8 +264,6 @@ export default function MyLibraryScreen() {
     />
   );
 }
-
-import { StyleSheet } from 'react-native';
 
 const styles = StyleSheet.create({
   // ==========================================

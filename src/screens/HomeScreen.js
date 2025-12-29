@@ -189,12 +189,21 @@ export default function HomeScreen({ navigation }) {
               <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
                 <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('RawThoughts')}>
                   <Ionicons name="list-outline" size={24} color={colors.primary} />
-                  <Text style={[styles.navButtonText, { color: colors.textSecondary }]}>Миттєві думки</Text>
+                  <Text style={[styles.navButtonText, { color: colors.textSecondary }]}>Думки</Text>
                 </TouchableOpacity>
+                
                 <View style={[styles.verticalDivider, { backgroundColor: colors.border }]} />
+                
                 <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('MyLibrary')}>
                   <Ionicons name="library-outline" size={24} color={colors.primary} />
-                  <Text style={[styles.navButtonText, { color: colors.textSecondary }]}>Моя бібліотека</Text>
+                  <Text style={[styles.navButtonText, { color: colors.textSecondary }]}>Бібліотека</Text>
+                </TouchableOpacity>
+
+                <View style={[styles.verticalDivider, { backgroundColor: colors.border }]} />
+
+                <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('Archive')}>
+                  <Ionicons name="archive-outline" size={24} color={colors.primary} />
+                  <Text style={[styles.navButtonText, { color: colors.textSecondary }]}>Архів</Text>
                 </TouchableOpacity>
               </View>
 
@@ -207,8 +216,6 @@ export default function HomeScreen({ navigation }) {
 }
 
 // СТИЛІ
-import { StyleSheet } from 'react-native';
-
 const styles = StyleSheet.create({
   // ==========================================
   // ОСНОВНІ КОНТЕЙНЕРИ (Layout)
@@ -400,5 +407,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginLeft: 15,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 100, // Вище футера
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
 });
